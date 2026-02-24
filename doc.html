@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation - API Clients (konitys-api-clients)</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.6; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+    header { background: linear-gradient(135deg, #059669, #0d9488); color: white; padding: 3rem 0; margin-bottom: 2rem; }
+    header .container { display: flex; align-items: center; gap: 1.5rem; }
+    header .logo { width: 64px; height: 64px; background: rgba(255,255,255,0.2); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
+    header h1 { font-size: 2rem; font-weight: 700; }
+    header p { opacity: 0.85; margin-top: 0.25rem; }
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; margin-right: 0.4rem; }
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #dcfce7; color: #166534; }
+    .badge-purple { background: #f3e8ff; color: #7c3aed; }
+    .badge-orange { background: #ffedd5; color: #c2410c; }
+    .badge-red { background: #fee2e2; color: #dc2626; }
+    .badge-teal { background: #ccfbf1; color: #0d9488; }
+    .card { background: white; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .card h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 2px solid #e2e8f0; display: flex; align-items: center; gap: 0.5rem; }
+    .card h3 { font-size: 1rem; font-weight: 600; margin: 1.25rem 0 0.5rem; color: #475569; }
+    table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.9rem; }
+    th { text-align: left; padding: 0.6rem 0.75rem; background: #f8fafc; border-bottom: 2px solid #e2e8f0; font-weight: 600; color: #475569; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    tr:hover td { background: #f8fafc; }
+    code { background: #f1f5f9; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.85em; color: #059669; font-family: 'Cascadia Code', 'Fira Code', monospace; }
+    pre { background: #1e293b; color: #e2e8f0; padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; margin: 0.75rem 0; font-size: 0.85rem; line-height: 1.7; }
+    pre code { background: none; color: inherit; padding: 0; }
+    .method { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700; font-family: monospace; min-width: 55px; text-align: center; }
+    .method-get { background: #dcfce7; color: #166534; }
+    .method-post { background: #dbeafe; color: #1d4ed8; }
+    .method-put { background: #ffedd5; color: #c2410c; }
+    .method-patch { background: #fef3c7; color: #92400e; }
+    .method-delete { background: #fee2e2; color: #dc2626; }
+    .tree { font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: 0.85rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem 1.25rem; line-height: 1.8; }
+    .tree .folder { color: #059669; font-weight: 600; }
+    .tree .file { color: #475569; }
+    .tree .comment { color: #94a3b8; font-style: italic; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .stat-card { text-align: center; padding: 1.25rem; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .stat-card .number { font-size: 2rem; font-weight: 700; color: #059669; }
+    .stat-card .label { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; }
+    .nav { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .nav a { padding: 0.5rem 1rem; background: white; border: 1px solid #e2e8f0; border-radius: 8px; text-decoration: none; color: #475569; font-size: 0.85rem; font-weight: 500; transition: all 0.15s; }
+    .nav a:hover { background: #ecfdf5; border-color: #a7f3d0; color: #059669; }
+    .schema-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem; margin: 0.5rem 0; }
+    .schema-box h4 { font-size: 0.9rem; font-weight: 600; color: #166534; margin-bottom: 0.5rem; }
+    @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .container { padding: 1rem; } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container">
+    <div class="logo">&#x1f5c4;&#xfe0f;</div>
+    <div>
+      <h1>konitys-api-clients</h1>
+      <p>Microservice API REST pour la gestion des clients, contacts, opportunites et pipelines</p>
+      <div style="margin-top: 0.75rem">
+        <span class="badge badge-green">Node.js</span>
+        <span class="badge badge-blue">Express</span>
+        <span class="badge badge-purple">TypeScript</span>
+        <span class="badge badge-teal">Prisma ORM</span>
+        <span class="badge badge-orange">PostgreSQL</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+
+<nav class="nav">
+  <a href="#stack">Stack</a>
+  <a href="#structure">Structure</a>
+  <a href="#endpoints">Endpoints API</a>
+  <a href="#schema">Schema BDD</a>
+  <a href="#auth">Authentification</a>
+  <a href="#services">Services</a>
+  <a href="#demarrage">Demarrage</a>
+  <a href="#env">Configuration</a>
+</nav>
+
+<!-- Stack -->
+<div class="card" id="stack">
+  <h2>&#x1f528; Stack Technique</h2>
+  <div class="grid-3">
+    <div class="stat-card"><div class="number">Express</div><div class="label">Framework HTTP</div></div>
+    <div class="stat-card"><div class="number">Prisma</div><div class="label">ORM type-safe</div></div>
+    <div class="stat-card"><div class="number">PostgreSQL</div><div class="label">Base de donnees</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Package</th><th>Usage</th></tr></thead>
+    <tbody>
+      <tr><td><code>express</code></td><td>Serveur HTTP + routing</td></tr>
+      <tr><td><code>@prisma/client</code></td><td>ORM avec types generes automatiquement</td></tr>
+      <tr><td><code>helmet</code></td><td>Headers de securite HTTP</td></tr>
+      <tr><td><code>cors</code></td><td>Gestion Cross-Origin (configurable via env)</td></tr>
+      <tr><td><code>jsonwebtoken</code> + <code>jwks-rsa</code></td><td>Verification JWT Keycloak (RS256 + JWKS)</td></tr>
+      <tr><td><code>zod</code></td><td>Validation des requetes (body, query)</td></tr>
+      <tr><td><code>multer</code></td><td>Upload de fichiers (commentaires)</td></tr>
+      <tr><td><code>exceljs</code></td><td>Export Excel (.xlsx)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Structure -->
+<div class="card" id="structure">
+  <h2>&#x1f4c1; Structure du Projet</h2>
+  <div class="tree">
+    <span class="folder">konitys-api-clients/</span><br>
+    ├── <span class="file">package.json</span><br>
+    ├── <span class="file">tsconfig.json</span><br>
+    ├── <span class="file">.env.example</span><br>
+    ├── <span class="folder">prisma/</span><br>
+    │&nbsp;&nbsp;&nbsp;├── <span class="file">schema.prisma</span> <span class="comment"># 20 modeles, enums, relations</span><br>
+    │&nbsp;&nbsp;&nbsp;├── <span class="file">seed.ts</span> <span class="comment"># Donnees de test (pays, secteurs, clients, pipeline)</span><br>
+    │&nbsp;&nbsp;&nbsp;└── <span class="folder">migrations/</span><br>
+    └── <span class="folder">src/</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">index.ts</span> <span class="comment"># Bootstrap Express (port 3004)</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="folder">middleware/</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">auth.middleware.ts</span> <span class="comment"># Keycloak JWT verification</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">error.middleware.ts</span> <span class="comment"># Error handler global</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="file">validate.middleware.ts</span> <span class="comment"># Validation Zod (body + query)</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="folder">routes/</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">index.ts</span> <span class="comment"># Monte toutes les routes sous /api/clients</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">client.routes.ts</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">client-contact.routes.ts</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;├── <span class="file">comment.routes.ts</span> <span class="comment"># + multer upload</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;&nbsp;└── <span class="file">reference-data.routes.ts</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="folder">controllers/</span> <span class="comment"># Parse req/res, delegue aux services</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;├── <span class="folder">services/</span> <span class="comment"># Logique metier + requetes Prisma</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;└── <span class="folder">utils/</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">prisma.ts</span> <span class="comment"># Singleton PrismaClient</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">errors.ts</span> <span class="comment"># AppError, NotFoundError, ValidationError</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├── <span class="file">pagination.ts</span> <span class="comment"># parsePagination(), buildPaginationResult()</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="file">logger.ts</span>
+  </div>
+</div>
+
+<!-- Endpoints -->
+<div class="card" id="endpoints">
+  <h2>&#x1f4e1; Endpoints API</h2>
+  <p>Base URL : <code>http://localhost:3004/api/clients</code></p>
+  <p>Toutes les routes necessitent un token Bearer Keycloak.</p>
+
+  <h3>&#x1f465; Clients</h3>
+  <table>
+    <thead><tr><th style="width:80px">Methode</th><th>Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/clients</code></td><td>Liste paginee avec filtres (key, clientType, typeCommercial, groupeClientId, sourceLeadId, departement, sectorIds, isQualifie, hasAddress, dateFrom, dateTo, sortBy, sortOrder, page, limit)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/clients/search?q=&amp;limit=</code></td><td>Recherche autocomplete (nom, enseigne, email, code_quadra)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/clients/duplicates</code></td><td>Liste des doublons detectes (meme nom ou email)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/clients/:id</code></td><td>Detail complet avec relations (contacts, adresses, secteurs, commentaires, opportunites, _count)</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/clients</code></td><td>Creation client + secteurs</td></tr>
+      <tr><td><span class="method method-put">PUT</span></td><td><code>/clients/:id</code></td><td>Mise a jour client + secteurs</td></tr>
+      <tr><td><span class="method method-delete">DELETE</span></td><td><code>/clients/:id</code></td><td>Soft delete (is_deleted = true). Bloque si opportunites liees.</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/clients/bulk-action</code></td><td>Actions en masse : <code>{ action: "delete"|"assign_sectors", clientIds: [], sectorIds?: [] }</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>&#x1f4de; Contacts (nested)</h3>
+  <table>
+    <thead><tr><th style="width:80px">Methode</th><th>Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/clients/:clientId/contacts</code></td><td>Liste des contacts du client</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/clients/:clientId/contacts</code></td><td>Ajout contact (si isPrimary: deprime les autres)</td></tr>
+      <tr><td><span class="method method-put">PUT</span></td><td><code>/clients/:clientId/contacts/:id</code></td><td>Modification contact</td></tr>
+      <tr><td><span class="method method-delete">DELETE</span></td><td><code>/clients/:clientId/contacts/:id</code></td><td>Suppression contact</td></tr>
+    </tbody>
+  </table>
+
+  <h3>&#x1f4ac; Commentaires (nested)</h3>
+  <table>
+    <thead><tr><th style="width:80px">Methode</th><th>Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/clients/:clientId/comments?page=&amp;limit=</code></td><td>Liste paginee avec pieces jointes</td></tr>
+      <tr><td><span class="method method-post">POST</span></td><td><code>/clients/:clientId/comments</code></td><td>Creation + upload fichiers (multipart, max 5 fichiers, 10MB). Types: PDF, DOC, DOCX, XLS, XLSX, images</td></tr>
+      <tr><td><span class="method method-delete">DELETE</span></td><td><code>/clients/:clientId/comments/:id</code></td><td>Suppression (cascade: pieces jointes aussi)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>&#x1f4ca; Donnees de reference</h3>
+  <table>
+    <thead><tr><th style="width:80px">Methode</th><th>Endpoint</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/reference-data/sectors</code></td><td>Secteurs d'activite (avec enfants)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/reference-data/groups</code></td><td>Groupes clients (PME, GE, TPE...)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/reference-data/sources</code></td><td>Sources de leads (Site web, Salon...)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/reference-data/countries</code></td><td>Pays</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/reference-data/contact-types</code></td><td>Types de contacts (Direction, Commercial...)</td></tr>
+      <tr><td><span class="method method-get">GET</span></td><td><code>/reference-data/opportunity-statuses</code></td><td>Statuts opportunites (Nouveau, En cours, Gagne...)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Format de reponse</h3>
+  <pre><code>// Succes (element)
+{ "success": true, "data": { ... } }
+
+// Succes (liste paginee)
+{ "success": true, "data": [...], "pagination": { "page": 1, "limit": 20, "total": 150, "totalPages": 8 } }
+
+// Erreur
+{ "success": false, "error": "Message d'erreur" }
+
+// Erreur de validation
+{ "success": false, "error": "Donnees invalides", "details": { "fieldErrors": {...}, "formErrors": [...] } }</code></pre>
+</div>
+
+<!-- Schema BDD -->
+<div class="card" id="schema">
+  <h2>&#x1f5c3;&#xfe0f; Schema Base de Donnees (Prisma)</h2>
+  <p><strong>20 modeles</strong> repartis en 3 groupes :</p>
+
+  <h3>Clients &amp; Relations</h3>
+  <div class="grid-2">
+    <div class="schema-box">
+      <h4>clients</h4>
+      <code>id, client_type (enum), nom, prenom, enseigne, siren, siret, tva_intracom, code_naf, effectif, chiffre_affaire, email, telephone, mobile, adresse, adresse_2, cp, ville, pays_id, departement, addr_lat, addr_lng, site_web, note, code_quadra, groupe_client_id, source_lead_id, type_commercial (enum), contact_raison, is_qualifie, is_deleted, deleted_at, created_by, updated_by, created_at, updated_at</code>
+    </div>
+    <div class="schema-box">
+      <h4>client_contacts</h4>
+      <code>id, client_id, civilite, nom, prenom, position, email, tel, telephone_2, contact_type_id, is_primary, created_at, updated_at</code>
+    </div>
+    <div class="schema-box">
+      <h4>clients_adresses</h4>
+      <code>id, client_id, label, adresse, adresse_2, cp, ville, pays_id, latitude, longitude, is_primary</code>
+    </div>
+    <div class="schema-box">
+      <h4>commentaires_clients</h4>
+      <code>id, client_id, user_id, user_name, contenu (text), created_at, updated_at</code>
+      <br><em>+ comment_attachments (file_name, file_path, file_size, mime_type)</em>
+    </div>
+  </div>
+
+  <h3>Tables de reference</h3>
+  <div class="grid-3">
+    <div class="schema-box"><h4>payss</h4><code>id, nom, code, phonecode</code></div>
+    <div class="schema-box"><h4>groupe_clients</h4><code>id, nom</code></div>
+    <div class="schema-box"><h4>source_leads</h4><code>id, nom</code></div>
+    <div class="schema-box"><h4>secteurs_activites</h4><code>id, nom, parent_id</code></div>
+    <div class="schema-box"><h4>contact_types</h4><code>id, nom</code></div>
+    <div class="schema-box"><h4>clients_has_secteurs_activites</h4><code>client_id, secteur_activite_id (unique)</code></div>
+  </div>
+
+  <h3>Pipeline &amp; Opportunites</h3>
+  <div class="grid-2">
+    <div class="schema-box">
+      <h4>opportunites</h4>
+      <code>id, nom, description, client_id, pipeline_id, stage_id, statut_id, source_lead_id, montant, probability, date_echeance, date_cloture, is_hot, commercial_id, motif_perte, note, created_by</code>
+    </div>
+    <div class="schema-box">
+      <h4>pipelines / pipeline_etapes</h4>
+      <code>Pipeline: id, nom, is_active</code><br>
+      <code>Etape: id, pipeline_id, nom, couleur, ordre, probability</code>
+    </div>
+    <div class="schema-box">
+      <h4>opportunite_timelines</h4>
+      <code>id, opportunite_id, user_id, user_name, action, description, old_value, new_value</code>
+    </div>
+    <div class="schema-box">
+      <h4>+ tables annexes</h4>
+      <code>opportunite_statuts, opportunite_commentaires, opportunite_tags, opportunite_tag_links, pipeline_ordres</code>
+    </div>
+  </div>
+
+  <h3>Enums PostgreSQL</h3>
+  <table>
+    <thead><tr><th>Enum</th><th>Valeurs</th></tr></thead>
+    <tbody>
+      <tr><td><code>ClientType</code></td><td><code>corporation</code>, <code>person</code></td></tr>
+      <tr><td><code>TypeCommercial</code></td><td><code>client</code>, <code>prospect</code></td></tr>
+      <tr><td><code>OpportunityStatusType</code></td><td><code>open</code>, <code>won</code>, <code>lost</code>, <code>cancelled</code>, <code>closed</code></td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Auth -->
+<div class="card" id="auth">
+  <h2>&#x1f512; Authentification (Keycloak)</h2>
+  <p>Toutes les routes API sont protegees par le middleware <code>auth.middleware.ts</code>.</p>
+
+  <h3>Fonctionnement</h3>
+  <ol style="padding-left: 1.5rem; margin: 0.5rem 0;">
+    <li>Le client envoie un header <code>Authorization: Bearer &lt;token&gt;</code></li>
+    <li>Le middleware recupere les cles publiques JWKS depuis Keycloak</li>
+    <li>Le token est verifie (algorithme RS256, issuer = realm Keycloak)</li>
+    <li>L'objet <code>req.user</code> est peuple avec : <code>sub, email, preferred_username, given_name, family_name, realm_access.roles</code></li>
+  </ol>
+
+  <h3>Interface AuthenticatedRequest</h3>
+  <pre><code>interface AuthenticatedRequest extends Request {
+  user?: {
+    sub: string;              // Keycloak user ID
+    email?: string;
+    preferred_username?: string;
+    given_name?: string;
+    family_name?: string;
+    realm_access?: {
+      roles: string[];
+    };
+  };
+}</code></pre>
+
+  <h3>Configuration Keycloak</h3>
+  <table>
+    <thead><tr><th>Variable env</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>KEYCLOAK_URL</code></td><td><code>http://localhost:8080</code></td><td>URL interne (Docker) pour JWKS</td></tr>
+      <tr><td><code>KEYCLOAK_PUBLIC_URL</code></td><td><code>http://localhost:8080</code></td><td>URL publique pour verifier l'issuer</td></tr>
+      <tr><td><code>KEYCLOAK_REALM</code></td><td><code>konitys</code></td><td>Nom du realm Keycloak</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Services -->
+<div class="card" id="services">
+  <h2>&#x2699;&#xfe0f; Architecture Services</h2>
+  <p>Pattern : <strong>Route → Controller → Service → Prisma</strong></p>
+
+  <h3>ClientService</h3>
+  <table>
+    <thead><tr><th>Methode</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>findAll(params)</code></td><td>Liste paginee avec 12+ filtres combines via <code>buildWhereClause()</code></td></tr>
+      <tr><td><code>findById(id)</code></td><td>Detail avec toutes les relations (include profond)</td></tr>
+      <tr><td><code>create(data)</code></td><td>Creation client + creation M:M secteurs en une transaction</td></tr>
+      <tr><td><code>update(id, data)</code></td><td>Mise a jour + resync secteurs (delete all + create many)</td></tr>
+      <tr><td><code>softDelete(id)</code></td><td>Soft delete. Verifie qu'il n'y a pas d'opportunites liees.</td></tr>
+      <tr><td><code>search(query, limit)</code></td><td>Recherche insensible a la casse sur 5 champs</td></tr>
+      <tr><td><code>findDuplicates(page, limit)</code></td><td>SQL brut : detecte clients avec meme nom (corporations) ou meme email</td></tr>
+      <tr><td><code>bulkDelete(ids)</code></td><td>Soft delete en masse</td></tr>
+      <tr><td><code>bulkAssignSectors(clientIds, sectorIds)</code></td><td>Ajout de secteurs en masse (skipDuplicates)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Gestion d'erreurs</h3>
+  <pre><code>// Classes d'erreurs (utils/errors.ts)
+AppError(statusCode, message)     → Erreur generique
+NotFoundError(resource)           → 404 "Client non trouve(e)"
+ValidationError(message)          → 400 "Impossible de supprimer..."
+UnauthorizedError()               → 401 "Non autorise"
+ForbiddenError()                  → 403 "Acces interdit"
+
+// Le middleware error.middleware.ts catch toutes les erreurs
+// et renvoie { success: false, error: "..." }</code></pre>
+</div>
+
+<!-- Demarrage -->
+<div class="card" id="demarrage">
+  <h2>&#x1f680; Demarrage</h2>
+
+  <h3>Prerequis</h3>
+  <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+    <li>Node.js 18+</li>
+    <li>PostgreSQL 14+ (en local ou via Docker)</li>
+    <li>Keycloak (optionnel pour le dev - commenter le middleware auth)</li>
+  </ul>
+
+  <h3>Installation</h3>
+  <pre><code># 1. Installer les dependances
+npm install
+
+# 2. Configurer l'environnement
+cp .env.example .env
+# Editer .env avec votre DATABASE_URL PostgreSQL
+
+# 3. Creer la base de donnees et appliquer les migrations
+npx prisma migrate dev --name init
+
+# 4. Charger les donnees de test
+npx prisma db seed
+
+# 5. Lancer le serveur de dev (hot reload)
+npm run dev</code></pre>
+
+  <h3>Scripts disponibles</h3>
+  <table>
+    <thead><tr><th>Script</th><th>Commande</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>npm run dev</code></td><td><code>ts-node-dev --respawn</code></td><td>Serveur dev avec hot reload</td></tr>
+      <tr><td><code>npm run build</code></td><td><code>tsc</code></td><td>Compilation TypeScript → dist/</td></tr>
+      <tr><td><code>npm start</code></td><td><code>node dist/index.js</code></td><td>Lancement en production</td></tr>
+      <tr><td><code>npm run typecheck</code></td><td><code>tsc --noEmit</code></td><td>Verification des types</td></tr>
+      <tr><td><code>npm run db:migrate</code></td><td><code>prisma migrate dev</code></td><td>Appliquer les migrations</td></tr>
+      <tr><td><code>npm run db:seed</code></td><td><code>prisma db seed</code></td><td>Charger les donnees de test</td></tr>
+      <tr><td><code>npm run db:studio</code></td><td><code>prisma studio</code></td><td>Interface web pour la BDD</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Verification</h3>
+  <pre><code># Health check
+curl http://localhost:3004/health
+# → { "status": "ok", "service": "konitys-api-clients", "timestamp": "..." }
+
+# Liste des clients (necessite auth)
+curl -H "Authorization: Bearer TOKEN" http://localhost:3004/api/clients/clients
+# → { "success": true, "data": [...], "pagination": {...} }</code></pre>
+</div>
+
+<!-- Env -->
+<div class="card" id="env">
+  <h2>&#x2699;&#xfe0f; Configuration (.env)</h2>
+  <table>
+    <thead><tr><th>Variable</th><th>Default</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>PORT</code></td><td><code>3004</code></td><td>Port du serveur Express</td></tr>
+      <tr><td><code>DATABASE_URL</code></td><td><code>postgresql://postgres:postgres@localhost:5432/konitys_clients</code></td><td>URL de connexion PostgreSQL</td></tr>
+      <tr><td><code>CORS_ORIGINS</code></td><td><code>http://localhost:5173,http://localhost:3000</code></td><td>Origines CORS autorisees (separes par virgule)</td></tr>
+      <tr><td><code>KEYCLOAK_URL</code></td><td><code>http://localhost:8080</code></td><td>URL interne Keycloak (JWKS)</td></tr>
+      <tr><td><code>KEYCLOAK_PUBLIC_URL</code></td><td><code>http://localhost:8080</code></td><td>URL publique Keycloak (issuer)</td></tr>
+      <tr><td><code>KEYCLOAK_REALM</code></td><td><code>konitys</code></td><td>Realm Keycloak</td></tr>
+      <tr><td><code>UPLOAD_DIR</code></td><td><code>./uploads</code></td><td>Dossier de stockage des fichiers uploades</td></tr>
+      <tr><td><code>MAX_FILE_SIZE</code></td><td><code>10485760</code></td><td>Taille max par fichier (10MB en octets)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Seed -->
+<div class="card">
+  <h2>&#x1f331; Donnees de test (Seed)</h2>
+  <p>Le fichier <code>prisma/seed.ts</code> cree :</p>
+  <table>
+    <thead><tr><th>Donnee</th><th>Quantite</th><th>Exemples</th></tr></thead>
+    <tbody>
+      <tr><td>Pays</td><td>4</td><td>France, Belgique, Suisse, Italie</td></tr>
+      <tr><td>Groupes clients</td><td>5</td><td>PME, Grande Entreprise, TPE, Association, Collectivite</td></tr>
+      <tr><td>Sources leads</td><td>8</td><td>Site web, Salon pro, Recommandation, Google Ads...</td></tr>
+      <tr><td>Secteurs d'activite</td><td>20</td><td>Agroalimentaire, Informatique, Evenementiel, Sante...</td></tr>
+      <tr><td>Types contacts</td><td>6</td><td>Direction, Commercial, Technique, Comptabilite...</td></tr>
+      <tr><td>Statuts opportunites</td><td>6</td><td>Nouveau, En cours, Gagne, Perdu, Annule, Ferme</td></tr>
+      <tr><td>Pipeline + 5 etapes</td><td>1</td><td>Prospect → Qualification → Proposition → Negociation → Closing</td></tr>
+      <tr><td>Clients</td><td>3</td><td>ACME Solutions (Pro), Tech Innov (Pro), Dupont Marie (Part)</td></tr>
+      <tr><td>Contacts</td><td>2</td><td>Jean Martin (ACME, principal), Sophie Bernard (ACME)</td></tr>
+      <tr><td>Opportunites</td><td>2</td><td>Evenement ACME 2026 (hot), Location bornes Tech Innov</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div style="text-align: center; padding: 2rem; color: #94a3b8; font-size: 0.85rem;">
+  konitys-api-clients &mdash; Express + TypeScript + Prisma + PostgreSQL
+</div>
+
+</div>
+</body>
+</html>

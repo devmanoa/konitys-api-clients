@@ -1,0 +1,439 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum ClientType {
+  corporation
+  person
+}
+
+enum TypeCommercial {
+  client
+  prospect
+}
+
+enum OpportunityStatusType {
+  open
+  won
+  lost
+  cancelled
+  closed
+}
+
+enum DevisStatus {
+  brouillon
+  envoye
+  accepte
+  refuse
+  annule
+}
+
+// ============================================
+// CLIENTS
+// ============================================
+
+model Client {
+  id                    Int             @id @default(autoincrement())
+  idClientCrm           String?         @unique @map("id_client_crm")
+  clientType            ClientType      @map("client_type")
+  nom                   String
+  prenom                String?
+  enseigne              String?
+  siren                 String?
+  siret                 String?
+  tvaIntracom           String?         @map("tva_intracom")
+  codeNaf               String?         @map("code_naf")
+  effectif              Int?
+  chiffreAffaire        Decimal?        @map("chiffre_affaire") @db.Decimal(12, 2)
+  email                 String?
+  telephone             String?
+  mobile                String?
+  adresse               String?
+  adresse2              String?         @map("adresse_2")
+  cp                    String?
+  ville                 String?
+  paysId                Int?            @map("pays_id")
+  departement           String?
+  country               String?
+  addrLat               Decimal?        @map("addr_lat") @db.Decimal(10, 8)
+  addrLng               Decimal?        @map("addr_lng") @db.Decimal(11, 8)
+  siteWeb               String?         @map("site_web")
+  note                  String?         @db.Text
+  codeQuadra            String?         @map("code_quadra")
+  groupeClientId        Int?            @map("groupe_client_id")
+  sourceLeadId          Int?            @map("source_lead_id")
+  typeCommercial        TypeCommercial? @map("type_commercial")
+  contactRaison         String?         @map("contact_raison")
+  connaissanceSelfizee  String?         @map("connaissance_selfizee")
+  isQualifie            Boolean         @default(false) @map("is_qualifie")
+  isDeleted             Boolean         @default(false) @map("is_deleted")
+  deletedAt             DateTime?       @map("deleted_at")
+  createdBy             Int?            @map("created_by")
+  updatedBy             Int?            @map("updated_by")
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  pays                  Country?        @relation(fields: [paysId], references: [id])
+  groupeClient          GroupeClient?   @relation(fields: [groupeClientId], references: [id])
+  sourceLead            SourceLead?     @relation(fields: [sourceLeadId], references: [id])
+  contacts              ClientContact[]
+  addresses             ClientAddress[]
+  comments              ClientComment[]
+  sectors               ClientSector[]
+  opportunities         Opportunity[]
+  devisRefs             DevisRef[]
+
+  @@index([clientType])
+  @@index([isDeleted])
+  @@index([groupeClientId])
+  @@index([sourceLeadId])
+  @@index([departement])
+  @@index([typeCommercial])
+  @@index([createdAt])
+  @@map("clients")
+}
+
+model ClientContact {
+  id              Int          @id @default(autoincrement())
+  idClientCrm     String?      @unique @map("id_client_crm")
+  clientId        Int          @map("client_id")
+  civilite        String?
+  nom             String
+  prenom          String?
+  position        String?
+  email           String?
+  tel             String?
+  telephone2      String?      @map("telephone_2")
+  contactTypeId   Int?         @map("contact_type_id")
+  isPrimary       Boolean      @default(false) @map("is_primary")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  client          Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  contactType     ContactType? @relation(fields: [contactTypeId], references: [id])
+
+  @@index([clientId])
+  @@map("client_contacts")
+}
+
+model ClientAddress {
+  id              Int       @id @default(autoincrement())
+  clientId        Int       @map("client_id")
+  label           String?
+  adresse         String?
+  adresse2        String?   @map("adresse_2")
+  cp              String?
+  ville           String?
+  paysId          Int?      @map("pays_id")
+  latitude        Decimal?  @db.Decimal(10, 8)
+  longitude       Decimal?  @db.Decimal(11, 8)
+  isPrimary       Boolean   @default(false) @map("is_primary")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  client          Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  pays            Country?  @relation(fields: [paysId], references: [id])
+
+  @@index([clientId])
+  @@map("clients_adresses")
+}
+
+model ClientComment {
+  id              Int       @id @default(autoincrement())
+  clientId        Int       @map("client_id")
+  userId          Int?      @map("user_id")
+  userName        String?   @map("user_name")
+  contenu         String    @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  client          Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  attachments     CommentAttachment[]
+
+  @@index([clientId])
+  @@map("commentaires_clients")
+}
+
+model CommentAttachment {
+  id              Int       @id @default(autoincrement())
+  commentId       Int       @map("comment_id")
+  fileName        String    @map("file_name")
+  filePath        String    @map("file_path")
+  fileSize        Int?      @map("file_size")
+  mimeType        String?   @map("mime_type")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  comment         ClientComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([commentId])
+  @@map("comment_attachments")
+}
+
+model ClientSector {
+  id              Int             @id @default(autoincrement())
+  clientId        Int             @map("client_id")
+  sectorId        Int             @map("secteur_activite_id")
+
+  client          Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  sector          SecteurActivite @relation(fields: [sectorId], references: [id])
+
+  @@unique([clientId, sectorId])
+  @@map("clients_has_secteurs_activites")
+}
+
+// ============================================
+// LOOKUP / REFERENCE TABLES
+// ============================================
+
+model Country {
+  id              Int       @id @default(autoincrement())
+  nom             String
+  code            String?   @unique
+  phonecode       String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  clients         Client[]
+  addresses       ClientAddress[]
+
+  @@map("payss")
+}
+
+model GroupeClient {
+  id              Int       @id @default(autoincrement())
+  nom             String
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  clients         Client[]
+
+  @@map("groupe_clients")
+}
+
+model SourceLead {
+  id              Int       @id @default(autoincrement())
+  nom             String
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  clients         Client[]
+  opportunities   Opportunity[]
+
+  @@map("source_leads")
+}
+
+model SecteurActivite {
+  id              Int             @id @default(autoincrement())
+  nom             String
+  parentId        Int?            @map("parent_id")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  parent          SecteurActivite?  @relation("SectorHierarchy", fields: [parentId], references: [id])
+  children        SecteurActivite[] @relation("SectorHierarchy")
+  clientSectors   ClientSector[]
+
+  @@map("secteurs_activites")
+}
+
+model ContactType {
+  id              Int       @id @default(autoincrement())
+  nom             String
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  contacts        ClientContact[]
+
+  @@map("contact_types")
+}
+
+// ============================================
+// DEVIS (références depuis le CRM)
+// ============================================
+
+model DevisRef {
+  id                Int          @id @default(autoincrement())
+  clientId          Int          @map("client_id")
+  indent            String?      @db.VarChar(100)
+  objet             String?
+  status            DevisStatus  @default(brouillon)
+  totalHt           Decimal?     @map("total_ht") @db.Decimal(12, 2)
+  totalTtc          Decimal?     @map("total_ttc") @db.Decimal(12, 2)
+  totalTva          Decimal?     @map("total_tva") @db.Decimal(12, 2)
+  dateCreation      DateTime?    @map("date_creation")
+  dateValidite      DateTime?    @map("date_validite")
+  dateSignature     DateTime?    @map("date_signature")
+  commercialId      Int?         @map("commercial_id")
+  commercialNom     String?      @map("commercial_nom")
+  note              String?      @db.Text
+  idDevisCrm        String?      @unique @map("id_devis_crm")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  client            Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([status])
+  @@map("devis_ref")
+}
+
+// ============================================
+// PIPELINE / OPPORTUNITIES
+// ============================================
+
+model Pipeline {
+  id              Int       @id @default(autoincrement())
+  nom             String
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  stages          PipelineStage[]
+  opportunities   Opportunity[]
+
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id              Int       @id @default(autoincrement())
+  pipelineId      Int       @map("pipeline_id")
+  nom             String
+  couleur         String?
+  ordre           Int       @default(0)
+  probability     Int?      @default(0)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  pipeline        Pipeline       @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  opportunities   Opportunity[]
+  kanbanOrders    PipelineOrder[]
+
+  @@index([pipelineId])
+  @@map("pipeline_etapes")
+}
+
+model Opportunity {
+  id              Int                @id @default(autoincrement())
+  nom             String
+  description     String?            @db.Text
+  clientId        Int                @map("client_id")
+  pipelineId      Int                @map("pipeline_id")
+  stageId         Int                @map("stage_id")
+  statusId        Int?               @map("statut_id")
+  sourceLeadId    Int?               @map("source_lead_id")
+  montant         Decimal?           @db.Decimal(12, 2)
+  probability     Int?               @default(0)
+  dateEcheance    DateTime?          @map("date_echeance")
+  dateCloture     DateTime?          @map("date_cloture")
+  isHot           Boolean            @default(false) @map("is_hot")
+  commercialId    Int?               @map("commercial_id")
+  motifPerte      String?            @map("motif_perte") @db.Text
+  note            String?            @db.Text
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+  createdBy       Int?               @map("created_by")
+
+  client          Client             @relation(fields: [clientId], references: [id])
+  pipeline        Pipeline           @relation(fields: [pipelineId], references: [id])
+  stage           PipelineStage      @relation(fields: [stageId], references: [id])
+  status          OpportunityStatus? @relation(fields: [statusId], references: [id])
+  sourceLead      SourceLead?        @relation(fields: [sourceLeadId], references: [id])
+  timeline        OpportunityTimeline[]
+  comments        OpportunityComment[]
+  tags            OpportunityTagLink[]
+  kanbanOrder     PipelineOrder?
+
+  @@index([clientId])
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([statusId])
+  @@index([isHot])
+  @@index([commercialId])
+  @@index([createdAt])
+  @@map("opportunites")
+}
+
+model OpportunityStatus {
+  id              Int                    @id @default(autoincrement())
+  nom             String
+  type            OpportunityStatusType
+  couleur         String?
+  ordre           Int                    @default(0)
+
+  opportunities   Opportunity[]
+
+  @@map("opportunite_statuts")
+}
+
+model OpportunityTimeline {
+  id              Int       @id @default(autoincrement())
+  opportunityId   Int       @map("opportunite_id")
+  userId          Int?      @map("user_id")
+  userName        String?   @map("user_name")
+  action          String
+  description     String    @db.Text
+  oldValue        String?   @map("old_value")
+  newValue        String?   @map("new_value")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId])
+  @@map("opportunite_timelines")
+}
+
+model OpportunityComment {
+  id              Int       @id @default(autoincrement())
+  opportunityId   Int       @map("opportunite_id")
+  userId          Int?      @map("user_id")
+  userName        String?   @map("user_name")
+  contenu         String    @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId])
+  @@map("opportunite_commentaires")
+}
+
+model OpportunityTag {
+  id              Int       @id @default(autoincrement())
+  nom             String    @unique
+  couleur         String?
+
+  links           OpportunityTagLink[]
+
+  @@map("opportunite_tags")
+}
+
+model OpportunityTagLink {
+  id              Int       @id @default(autoincrement())
+  opportunityId   Int       @map("opportunite_id")
+  tagId           Int       @map("tag_id")
+
+  opportunity     Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  tag             OpportunityTag @relation(fields: [tagId], references: [id])
+
+  @@unique([opportunityId, tagId])
+  @@map("opportunite_tag_links")
+}
+
+model PipelineOrder {
+  id              Int       @id @default(autoincrement())
+  opportunityId   Int       @unique @map("opportunite_id")
+  stageId         Int       @map("stage_id")
+  ordre           Int       @default(0)
+
+  opportunity     Opportunity   @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  stage           PipelineStage @relation(fields: [stageId], references: [id])
+
+  @@index([stageId, ordre])
+  @@map("pipeline_ordres")
+}
