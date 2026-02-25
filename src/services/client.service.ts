@@ -2,6 +2,7 @@ import { Prisma, ClientType, TypeCommercial } from '@prisma/client';
 import { prisma } from '../utils/prisma';
 import { buildPaginationResult, PaginationResult } from '../utils/pagination';
 import { NotFoundError, ValidationError } from '../utils/errors';
+import { rabbitmq } from '../utils/rabbitmq';
 
 export interface ClientFilters {
   key?: string;
@@ -143,6 +144,15 @@ class ClientService {
       },
     });
 
+    rabbitmq.publish('client.created', {
+      id: client.id,
+      idClientCrm: client.idClientCrm,
+      nom: client.nom,
+      email: client.email,
+      clientType: client.clientType,
+      typeCommercial: client.typeCommercial,
+    });
+
     return client;
   }
 
@@ -178,6 +188,15 @@ class ClientService {
         sectors: { include: { sector: true } },
         contacts: true,
       },
+    });
+
+    rabbitmq.publish('client.updated', {
+      id: client.id,
+      idClientCrm: client.idClientCrm,
+      nom: client.nom,
+      email: client.email,
+      clientType: client.clientType,
+      typeCommercial: client.typeCommercial,
     });
 
     return client;

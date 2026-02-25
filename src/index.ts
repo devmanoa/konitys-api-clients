@@ -8,6 +8,7 @@ import fs from 'fs';
 import { router } from './routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { logger } from './utils/logger';
+import { rabbitmq } from './utils/rabbitmq';
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -57,23 +58,21 @@ app.use(errorMiddleware);
 
 const server = createServer(app);
 
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   logger.info(`API Clients running on http://localhost:${PORT}`);
   logger.info(`Health check: http://localhost:${PORT}/health`);
   logger.info(`API endpoint: http://localhost:${PORT}/api/clients`);
+  await rabbitmq.connect();
 });
 
 // Graceful shutdown
-process.on('SIGINT', () => {
+async function shutdown() {
   logger.info('Shutting down gracefully...');
+  await rabbitmq.close();
   server.close(() => {
     process.exit(0);
   });
-});
+}
 
-process.on('SIGTERM', () => {
-  logger.info('Shutting down gracefully...');
-  server.close(() => {
-    process.exit(0);
-  });
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
