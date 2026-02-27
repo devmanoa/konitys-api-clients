@@ -1,11 +1,11 @@
-import amqp, { Connection, Channel } from 'amqplib';
+import amqp from 'amqplib';
 import { logger } from './logger';
 
 const RABBITMQ_URL = process.env.RABBITMQ_URL || '';
 const EXCHANGE = process.env.RABBITMQ_EXCHANGE || 'konitysevents';
 
-let connection: Connection | null = null;
-let channel: Channel | null = null;
+let connection: amqp.ChannelModel | null = null;
+let channel: amqp.Channel | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function connect(): Promise<void> {
@@ -20,7 +20,7 @@ async function connect(): Promise<void> {
     await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
     logger.info(`[RabbitMQ] Connected — exchange "${EXCHANGE}" ready`);
 
-    connection.on('error', (err) => {
+    connection.on('error', (err: Error) => {
       logger.error('[RabbitMQ] Connection error:', err.message);
       scheduleReconnect();
     });
