@@ -42,6 +42,12 @@ export const authMiddleware = (
   res: Response,
   next: NextFunction,
 ) => {
+  // Skip auth if disabled via env
+  if (process.env.DISABLE_AUTH === 'true') {
+    req.user = { sub: 'dev-user', email: 'dev@local', preferred_username: 'dev' };
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

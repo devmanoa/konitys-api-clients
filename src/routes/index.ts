@@ -4,6 +4,7 @@ import clientRoutes from './client.routes';
 import clientContactRoutes from './client-contact.routes';
 import commentRoutes from './comment.routes';
 import devisRefRoutes from './devis-ref.routes';
+import reglementRefRoutes from './reglement-ref.routes';
 import referenceDataRoutes from './reference-data.routes';
 
 export const router = Router();
@@ -15,4 +16,5 @@ router.use('/clients', clientRoutes);
 router.use('/clients', clientContactRoutes);
 router.use('/clients', commentRoutes);
 router.use('/clients', devisRefRoutes);
+router.use('/clients', reglementRefRoutes);
 router.use('/reference-data', referenceDataRoutes);

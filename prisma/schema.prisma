@@ -93,6 +93,7 @@ model Client {
   sectors               ClientSector[]
   opportunities         Opportunity[]
   devisRefs             DevisRef[]
+  reglementRefs         ReglementRef[]
 
   @@index([clientType])
   @@index([isDeleted])
@@ -282,6 +283,33 @@ model DevisRef {
   @@index([clientId])
   @@index([status])
   @@map("devis_ref")
+}
+
+// ============================================
+// REGLEMENTS (références depuis le CRM)
+// ============================================
+
+model ReglementRef {
+  id                Int          @id @default(autoincrement())
+  clientId          Int          @map("client_id")
+  type              String       @db.VarChar(1)  // "C" crédit, "D" débit
+  date              DateTime?
+  montant           Decimal?     @db.Decimal(12, 2)
+  montantRestant    Decimal?     @map("montant_restant") @db.Decimal(12, 2)
+  moyenReglement    String?      @map("moyen_reglement")
+  reference         String?      @db.VarChar(255)
+  note              String?      @db.Text
+  etat              String?
+  commercialNom     String?      @map("commercial_nom")
+  idReglementCrm    String?      @unique @map("id_reglement_crm")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  client            Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([type])
+  @@map("reglement_ref")
 }
 
 // ============================================

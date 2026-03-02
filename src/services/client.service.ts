@@ -104,6 +104,9 @@ class ClientService {
         devisRefs: {
           orderBy: { createdAt: 'desc' },
         },
+        reglementRefs: {
+          orderBy: { date: 'desc' },
+        },
         _count: {
           select: {
             opportunities: true,
@@ -111,6 +114,7 @@ class ClientService {
             contacts: true,
             addresses: true,
             devisRefs: true,
+            reglementRefs: true,
           },
         },
       },
