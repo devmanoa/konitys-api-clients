@@ -157,7 +157,7 @@ async function main() {
   }
 
   // Contact types
-  const ctNames = ['Direction', 'Commercial', 'Technique', 'Comptabilité', 'Communication', 'RH'];
+  const ctNames = ['Commercial', 'Facturation', 'Projet'];
   const contactTypes: { id: number }[] = [];
   for (const nom of ctNames) {
     let ct = await prisma.contactType.findFirst({ where: { nom } });

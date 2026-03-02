@@ -34,4 +34,4 @@ ENV PORT=3004
 
 EXPOSE 3004
 
-CMD npx prisma db push --skip-generate && node dist/index.js
+CMD npx prisma db push --skip-generate && node prisma/seed-ref.js && node dist/index.js
