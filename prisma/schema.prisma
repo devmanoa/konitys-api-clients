@@ -104,6 +104,7 @@ model Client {
   devisRefs             DevisRef[]
   reglementRefs         ReglementRef[]
   factureRefs           FactureRef[]
+  avoirRefs             AvoirRef[]
 
   @@index([clientType])
   @@index([isDeleted])
@@ -349,6 +350,35 @@ model FactureRef {
   @@index([clientId])
   @@index([status])
   @@map("facture_ref")
+}
+
+// ============================================
+// AVOIRS (références depuis le CRM)
+// ============================================
+
+model AvoirRef {
+  id                Int            @id @default(autoincrement())
+  clientId          Int            @map("client_id")
+  indent            String?        @db.VarChar(100)
+  objet             String?
+  status            FactureStatus  @default(brouillon)
+  totalHt           Decimal?       @map("total_ht") @db.Decimal(12, 2)
+  totalTtc          Decimal?       @map("total_ttc") @db.Decimal(12, 2)
+  totalTva          Decimal?       @map("total_tva") @db.Decimal(12, 2)
+  dateCreation      DateTime?      @map("date_creation")
+  restantDu         Decimal?       @map("restant_du") @db.Decimal(12, 2)
+  nbrReglement      Int?           @default(0) @map("nbr_reglement")
+  factureIndent     String?        @map("facture_indent")
+  commercialNom     String?        @map("commercial_nom")
+  idAvoirCrm        String?        @unique @map("id_avoir_crm")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([status])
+  @@map("avoir_ref")
 }
 
 // ============================================

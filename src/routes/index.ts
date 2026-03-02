@@ -6,6 +6,7 @@ import commentRoutes from './comment.routes';
 import devisRefRoutes from './devis-ref.routes';
 import reglementRefRoutes from './reglement-ref.routes';
 import factureRefRoutes from './facture-ref.routes';
+import avoirRefRoutes from './avoir-ref.routes';
 import referenceDataRoutes from './reference-data.routes';
 
 export const router = Router();
@@ -19,4 +20,5 @@ router.use('/clients', commentRoutes);
 router.use('/clients', devisRefRoutes);
 router.use('/clients', reglementRefRoutes);
 router.use('/clients', factureRefRoutes);
+router.use('/clients', avoirRefRoutes);
 router.use('/reference-data', referenceDataRoutes);

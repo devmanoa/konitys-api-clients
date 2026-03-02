@@ -110,6 +110,9 @@ class ClientService {
         factureRefs: {
           orderBy: { dateCreation: 'desc' },
         },
+        avoirRefs: {
+          orderBy: { dateCreation: 'desc' },
+        },
         _count: {
           select: {
             opportunities: true,
@@ -119,6 +122,7 @@ class ClientService {
             devisRefs: true,
             reglementRefs: true,
             factureRefs: true,
+            avoirRefs: true,
           },
         },
       },
