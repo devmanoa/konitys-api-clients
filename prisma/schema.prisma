@@ -38,6 +38,15 @@ enum DevisStatus {
   annule
 }
 
+enum FactureStatus {
+  brouillon
+  emise
+  payee
+  partiellement_payee
+  annulee
+  en_recouvrement
+}
+
 // ============================================
 // CLIENTS
 // ============================================
@@ -94,6 +103,7 @@ model Client {
   opportunities         Opportunity[]
   devisRefs             DevisRef[]
   reglementRefs         ReglementRef[]
+  factureRefs           FactureRef[]
 
   @@index([clientType])
   @@index([isDeleted])
@@ -310,6 +320,35 @@ model ReglementRef {
   @@index([clientId])
   @@index([type])
   @@map("reglement_ref")
+}
+
+// ============================================
+// FACTURES (références depuis le CRM)
+// ============================================
+
+model FactureRef {
+  id                Int            @id @default(autoincrement())
+  clientId          Int            @map("client_id")
+  indent            String?        @db.VarChar(100)
+  objet             String?
+  status            FactureStatus  @default(brouillon)
+  totalHt           Decimal?       @map("total_ht") @db.Decimal(12, 2)
+  totalTtc          Decimal?       @map("total_ttc") @db.Decimal(12, 2)
+  totalTva          Decimal?       @map("total_tva") @db.Decimal(12, 2)
+  dateCreation      DateTime?      @map("date_creation")
+  dateEvenement     DateTime?      @map("date_evenement")
+  restantDu         Decimal?       @map("restant_du") @db.Decimal(12, 2)
+  nbrReglement      Int?           @default(0) @map("nbr_reglement")
+  commercialNom     String?        @map("commercial_nom")
+  idFactureCrm      String?        @unique @map("id_facture_crm")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  client            Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([status])
+  @@map("facture_ref")
 }
 
 // ============================================

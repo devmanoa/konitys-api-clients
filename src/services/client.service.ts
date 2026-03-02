@@ -107,6 +107,9 @@ class ClientService {
         reglementRefs: {
           orderBy: { date: 'desc' },
         },
+        factureRefs: {
+          orderBy: { dateCreation: 'desc' },
+        },
         _count: {
           select: {
             opportunities: true,
@@ -115,6 +118,7 @@ class ClientService {
             addresses: true,
             devisRefs: true,
             reglementRefs: true,
+            factureRefs: true,
           },
         },
       },
