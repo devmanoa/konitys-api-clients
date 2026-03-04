@@ -4,6 +4,30 @@ import { clientService, ClientFilters } from '../services/client.service';
 import { parsePagination } from '../utils/pagination';
 import { ClientType, TypeCommercial } from '@prisma/client';
 
+function mapClientBody(body: Record<string, any>): Record<string, any> {
+  const {
+    client_type, type_commercial, groupe_client_id, source_lead_id,
+    tva_intracom, code_naf, chiffre_affaire, adresse_2, site_web,
+    contact_raison, pays_id, code_quadra,
+    ...rest
+  } = body;
+  return {
+    ...rest,
+    ...(client_type !== undefined && { clientType: client_type }),
+    ...(type_commercial !== undefined && { typeCommercial: type_commercial }),
+    ...(groupe_client_id !== undefined && { groupeClientId: groupe_client_id }),
+    ...(source_lead_id !== undefined && { sourceLeadId: source_lead_id }),
+    ...(tva_intracom !== undefined && { tvaIntracom: tva_intracom }),
+    ...(code_naf !== undefined && { codeNaf: code_naf }),
+    ...(chiffre_affaire !== undefined && { chiffreAffaire: chiffre_affaire }),
+    ...(adresse_2 !== undefined && { adresse2: adresse_2 }),
+    ...(site_web !== undefined && { siteWeb: site_web }),
+    ...(contact_raison !== undefined && { contactRaison: contact_raison }),
+    ...(pays_id !== undefined && { pays: pays_id ? { connect: { id: pays_id } } : { disconnect: true } }),
+    ...(code_quadra !== undefined && { codeQuadra: code_quadra }),
+  };
+}
+
 class ClientController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
@@ -61,13 +85,14 @@ class ClientController {
 
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { sectorIds, ...clientData } = req.body;
+      const { sectorIds, ...rawData } = req.body;
+      const clientData = mapClientBody(rawData);
 
       const client = await clientService.create({
         ...clientData,
         createdBy: req.user?.sub ? parseInt(req.user.sub) : undefined,
         sectorIds,
-      });
+      } as any);
 
       res.status(201).json({
         success: true,
@@ -81,13 +106,14 @@ class ClientController {
   async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
-      const { sectorIds, ...clientData } = req.body;
+      const { sectorIds, ...rawData } = req.body;
+      const clientData = mapClientBody(rawData);
 
       const client = await clientService.update(id, {
         ...clientData,
         updatedBy: req.user?.sub ? parseInt(req.user.sub) : undefined,
         sectorIds,
-      });
+      } as any);
 
       res.json({
         success: true,
