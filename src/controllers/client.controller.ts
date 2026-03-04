@@ -28,6 +28,9 @@ class ClientController {
         hasAddress: req.query.hasAddress !== undefined ? req.query.hasAddress === 'true' : undefined,
         dateFrom: req.query.dateFrom as string,
         dateTo: req.query.dateTo as string,
+        hasDevis: req.query.hasDevis !== undefined ? req.query.hasDevis === 'true' : undefined,
+        hasFacture: req.query.hasFacture !== undefined ? req.query.hasFacture === 'true' : undefined,
+        hasReglement: req.query.hasReglement !== undefined ? req.query.hasReglement === 'true' : undefined,
       };
 
       const result = await clientService.findAll({ page, limit, sortBy, sortOrder, filters });

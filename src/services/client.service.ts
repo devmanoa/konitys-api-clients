@@ -16,6 +16,9 @@ export interface ClientFilters {
   hasAddress?: boolean;
   dateFrom?: string;
   dateTo?: string;
+  hasDevis?: boolean;
+  hasFacture?: boolean;
+  hasReglement?: boolean;
 }
 
 export interface ClientListResult {
@@ -341,6 +344,15 @@ class ClientService {
       if (filters.dateFrom) where.createdAt.gte = new Date(filters.dateFrom);
       if (filters.dateTo) where.createdAt.lte = new Date(filters.dateTo);
     }
+
+    if (filters.hasDevis === true) where.devisRefs = { some: {} };
+    else if (filters.hasDevis === false) where.devisRefs = { none: {} };
+
+    if (filters.hasFacture === true) where.factureRefs = { some: {} };
+    else if (filters.hasFacture === false) where.factureRefs = { none: {} };
+
+    if (filters.hasReglement === true) where.reglementRefs = { some: {} };
+    else if (filters.hasReglement === false) where.reglementRefs = { none: {} };
 
     return where;
   }
