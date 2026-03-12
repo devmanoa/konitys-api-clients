@@ -11,7 +11,10 @@
     "db:migrate": "npx prisma migrate dev",
     "db:push": "npx prisma db push",
     "db:seed": "npx prisma db seed",
-    "db:studio": "npx prisma studio"
+    "db:studio": "npx prisma studio",
+    "migrate": "npx ts-node scripts/migrate-from-crm.ts sql/",
+    "migrate:clients": "npx ts-node scripts/migrate-from-crm.ts sql/ --only=clients,client_contacts,clients_has_secteurs_activites",
+    "migrate:devis": "npx ts-node scripts/migrate-from-crm.ts sql/ --only=devis,devis_factures,avoirs,reglements"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
