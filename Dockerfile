@@ -6,7 +6,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY prisma ./prisma/
 
-RUN npm ci --include=dev
+RUN npm ci
 
 COPY tsconfig.json ./
 COPY src ./src/
