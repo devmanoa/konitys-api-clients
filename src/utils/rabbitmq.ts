@@ -83,13 +83,15 @@ async function publishViaHttp(routingKey: string, message: string): Promise<bool
 }
 
 async function publish(routingKey: string, payload: Record<string, any>): Promise<void> {
+  const fullRoutingKey = `${APP_NAME}.${routingKey}`;
+
   if (!connection && !RABBITMQ_HTTP_URL) {
-    logger.warn(`[RabbitMQ] Not connected — skipping publish: ${routingKey}`);
+    logger.warn(`[RabbitMQ] Not connected — skipping publish: ${fullRoutingKey}`);
     return;
   }
 
   const message = JSON.stringify({
-    event: routingKey,
+    event: fullRoutingKey,
     source: APP_NAME,
     timestamp: new Date().toISOString(),
     data: payload,
@@ -98,24 +100,24 @@ async function publish(routingKey: string, payload: Record<string, any>): Promis
   try {
     // Prefer HTTP Management API (reliable on Node 20 + Docker)
     if (RABBITMQ_HTTP_URL) {
-      const routed = await publishViaHttp(routingKey, message);
-      logger.info(`[RabbitMQ] Published via HTTP: ${routingKey} (routed: ${routed})`);
+      const routed = await publishViaHttp(fullRoutingKey, message);
+      logger.info(`[RabbitMQ] Published via HTTP: ${fullRoutingKey} (routed: ${routed})`);
       return;
     }
 
     // Fallback: amqplib (may silently fail on Node 20 + Docker bridge)
     if (connection) {
       const ch = await connection.createChannel();
-      ch.publish(EXCHANGE, routingKey, Buffer.from(message), {
+      ch.publish(EXCHANGE, fullRoutingKey, Buffer.from(message), {
         contentType: 'application/json',
         persistent: true,
       });
       await new Promise<void>((resolve) => setImmediate(resolve));
       await ch.close();
-      logger.info(`[RabbitMQ] Published via AMQP: ${routingKey}`);
+      logger.info(`[RabbitMQ] Published via AMQP: ${fullRoutingKey}`);
     }
   } catch (err: any) {
-    logger.error(`[RabbitMQ] Publish failed (${routingKey}):`, err.message);
+    logger.error(`[RabbitMQ] Publish failed (${fullRoutingKey}):`, err.message);
   }
 }
 
