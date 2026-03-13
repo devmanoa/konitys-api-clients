@@ -5,7 +5,6 @@ const RABBITMQ_URL = process.env.RABBITMQ_URL || '';
 const EXCHANGE = process.env.RABBITMQ_EXCHANGE || 'konitysevents';
 
 let connection: amqp.ChannelModel | null = null;
-let channel: amqp.Channel | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function connect(): Promise<void> {
@@ -16,8 +15,10 @@ async function connect(): Promise<void> {
 
   try {
     connection = await amqp.connect(RABBITMQ_URL);
-    channel = await connection.createChannel();
-    await channel.assertExchange(EXCHANGE, 'topic', { durable: true });
+    // Assert exchange once on connect using a temporary channel
+    const ch = await connection.createChannel();
+    await ch.assertExchange(EXCHANGE, 'topic', { durable: true });
+    await ch.close();
     logger.info(`[RabbitMQ] Connected — exchange "${EXCHANGE}" ready`);
 
     connection.on('error', (err: Error) => {
@@ -27,7 +28,6 @@ async function connect(): Promise<void> {
 
     connection.on('close', () => {
       logger.warn('[RabbitMQ] Connection closed');
-      channel = null;
       connection = null;
       scheduleReconnect();
     });
@@ -46,8 +46,10 @@ function scheduleReconnect(): void {
   }, 5000);
 }
 
-function publish(routingKey: string, payload: Record<string, any>): void {
-  if (!channel) return;
+// Workaround for amqplib channel.publish() silently broken on Node 20 + Docker bridge:
+// Use a fresh channel per publish to force socket flush.
+async function publish(routingKey: string, payload: Record<string, any>): Promise<void> {
+  if (!connection) return;
 
   const message = JSON.stringify({
     event: routingKey,
@@ -56,10 +58,15 @@ function publish(routingKey: string, payload: Record<string, any>): void {
   });
 
   try {
-    channel.publish(EXCHANGE, routingKey, Buffer.from(message), {
+    const ch = await connection.createChannel();
+    ch.publish(EXCHANGE, routingKey, Buffer.from(message), {
       contentType: 'application/json',
       persistent: true,
     });
+    // Wait for broker confirm before closing channel
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    await ch.close();
+    logger.debug(`[RabbitMQ] Published: ${routingKey}`);
   } catch (err: any) {
     logger.error(`[RabbitMQ] Publish failed (${routingKey}):`, err.message);
   }
@@ -71,12 +78,10 @@ async function close(): Promise<void> {
     reconnectTimer = null;
   }
   try {
-    if (channel) await channel.close();
     if (connection) await connection.close();
   } catch {
     // ignore close errors during shutdown
   }
-  channel = null;
   connection = null;
   logger.info('[RabbitMQ] Disconnected');
 }

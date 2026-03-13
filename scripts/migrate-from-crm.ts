@@ -20,6 +20,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 
+// Single connection + high timeout for bulk inserts over remote connections
+if (process.env.DATABASE_URL && !process.env.DATABASE_URL.includes('connection_limit')) {
+  const sep = process.env.DATABASE_URL.includes('?') ? '&' : '?';
+  process.env.DATABASE_URL += `${sep}connection_limit=1&pool_timeout=300`;
+}
 const prisma = new PrismaClient();
 
 // ── Mapping table → fichier ─────────────────────────────────────
@@ -277,7 +282,8 @@ async function loadTableRows(dir: string, tableName: string): Promise<Record<str
 
 function toStr(v: any): string | null {
   if (v === null || v === undefined || v === '') return null;
-  return String(v).trim() || null;
+  // Remove null bytes (0x00) which PostgreSQL UTF8 rejects
+  return String(v).replace(/\0/g, '').trim() || null;
 }
 
 function toInt(v: any): number | null {
@@ -518,11 +524,39 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
   // ── 6. Clients (streaming) ────────────────────────────────────
   console.log('\n── 6. Migration des clients ──');
   const clientMap = new Map<number, number>();
-  let clientCreated = 0, clientUpdated = 0, clientSkipped = 0, clientCount = 0;
+  let clientCreated = 0, clientSkipped = 0, clientCount = 0;
 
   const clientFile = path.join(dir, TABLE_FILE_MAP['clients']!);
   if (shouldRun('clients') && fs.existsSync(clientFile)) {
-    // Migration complète : stream + upsert en DB
+    const existingClients = await prisma.client.findMany({ select: { id: true, idClientCrm: true } });
+    const existingClientsSet = new Set(existingClients.map(c => c.idClientCrm));
+    for (const c of existingClients) {
+      if (c.idClientCrm) {
+        const crmId = parseInt(c.idClientCrm, 10);
+        if (!isNaN(crmId)) clientMap.set(crmId, c.id);
+      }
+    }
+    console.log(`  ${existingClientsSet.size} clients déjà en DB`);
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+
+    const flushClients = async () => {
+      if (buffer.length === 0) return;
+      const result = await prisma.client.createManyAndReturn({
+        data: buffer, skipDuplicates: true,
+        select: { id: true, idClientCrm: true },
+      });
+      for (const c of result) {
+        if (c.idClientCrm) {
+          const crmId = parseInt(c.idClientCrm, 10);
+          if (!isNaN(crmId)) clientMap.set(crmId, c.id);
+        }
+      }
+      clientCreated += result.length;
+      buffer = [];
+    };
+
     await streamTableRows(clientFile, 'clients', async (c) => {
       clientCount++;
       const crmId = toInt(c.id);
@@ -530,17 +564,17 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
       const idClientCrm = String(crmId);
       const nom = toStr(c.nom);
       if (!nom) { clientSkipped++; return; }
+      if (existingClientsSet.has(idClientCrm)) return;
 
       let clientType: ClientType = 'corporation';
       if (toStr(c.client_type) === 'person') clientType = 'person';
-
       let typeCommercial: TypeCommercial | null = null;
       const rawTC = toStr(c.type_commercial);
       if (rawTC === 'client') typeCommercial = 'client';
       else if (rawTC === 'prospect') typeCommercial = 'prospect';
 
-      const data = {
-        clientType, nom,
+      buffer.push({
+        idClientCrm, clientType, nom,
         prenom: toStr(c.prenom), enseigne: toStr(c.enseigne),
         siren: toStr(c.siren), siret: toStr(c.siret),
         tvaIntracom: toStr(c.tva_intracom), codeNaf: toStr(c.code_naf),
@@ -560,44 +594,46 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
         groupeClientId: c.groupe_client_id ? (groupeMap.get(toInt(c.groupe_client_id)!) || null) : null,
         sourceLeadId: c.source_lead_id ? (sourceMap.get(toInt(c.source_lead_id)!) || null) : null,
         createdAt: toDate(c.created) || new Date(),
-      };
-
-      const existing = await prisma.client.findUnique({ where: { idClientCrm } });
-      if (existing) {
-        await prisma.client.update({ where: { id: existing.id }, data });
-        clientMap.set(crmId, existing.id);
-        clientUpdated++;
-      } else {
-        const created = await prisma.client.create({ data: { ...data, idClientCrm } });
-        clientMap.set(crmId, created.id);
-        clientCreated++;
+      });
+      if (buffer.length >= BATCH) {
+        await flushClients();
+        console.log(`  ${clientCount} clients traités...`);
       }
-
-      if (clientCount % 500 === 0) console.log(`  ${clientCount} clients traités...`);
     });
+    await flushClients();
   } else if (!shouldRun('clients') && fs.existsSync(clientFile)) {
-    // Pas de migration clients, mais on charge le clientMap depuis le fichier SQL (lookup only)
-    console.log('  Chargement clientMap depuis clients.sql (lookup uniquement)...');
-    await streamTableRows(clientFile, 'clients', async (c) => {
-      const crmId = toInt(c.id);
-      if (!crmId) return;
-      const idClientCrm = String(crmId);
-      const existing = await prisma.client.findUnique({ where: { idClientCrm }, select: { id: true } });
-      if (existing) clientMap.set(crmId, existing.id);
-      clientCount++;
-      if (clientCount % 1000 === 0) console.log(`  ${clientCount} clients scannés...`);
-    });
+    // Pas de migration clients, mais on charge le clientMap depuis la DB en une seule requête
+    console.log('  Chargement clientMap depuis la DB (bulk)...');
+    const allClients = await prisma.client.findMany({ select: { id: true, idClientCrm: true } });
+    for (const c of allClients) {
+      if (c.idClientCrm) {
+        const crmId = parseInt(c.idClientCrm, 10);
+        if (!isNaN(crmId)) clientMap.set(crmId, c.id);
+      }
+    }
     console.log(`  clientMap chargé: ${clientMap.size} clients trouvés en DB`);
   } else {
     console.warn('  [WARN] clients.sql absent — clientMap vide, les FK client_id ne seront pas résolues.');
   }
-  console.log(`  ${clientCreated} créés, ${clientUpdated} mis à jour, ${clientSkipped} ignorés`);
+  console.log(`  ${clientCreated} créés, ${clientSkipped} ignorés`);
 
   // ── 7. Secteurs par client (streaming) ───────────────────────
   console.log('\n── 7. Migration des secteurs par client ──');
   let csCreated = 0;
   const csFile = path.join(dir, TABLE_FILE_MAP['clients_has_secteurs_activites']!);
   if (shouldRun('clients_has_secteurs_activites') && fs.existsSync(csFile)) {
+    const existingCS = await prisma.clientSector.findMany({ select: { clientId: true, sectorId: true } });
+    const existingCSSet = new Set(existingCS.map(r => `${r.clientId}_${r.sectorId}`));
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+    const flushCS = async () => {
+      if (buffer.length === 0) return;
+      await prisma.clientSector.createMany({ data: buffer, skipDuplicates: true });
+      csCreated += buffer.length;
+      buffer = [];
+    };
+
     await streamTableRows(csFile, 'clients_has_secteurs_activites', async (cs) => {
       const clientCrmId = toInt(cs.client_id);
       const secteurCrmId = toInt(cs.secteurs_activite_id);
@@ -605,31 +641,41 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
       const clientId = clientMap.get(clientCrmId);
       const sectorId = secteurMap.get(secteurCrmId);
       if (!clientId || !sectorId) return;
-      await prisma.clientSector.upsert({
-        where: { clientId_sectorId: { clientId, sectorId } },
-        update: {},
-        create: { clientId, sectorId },
-      });
-      csCreated++;
+      if (existingCSSet.has(`${clientId}_${sectorId}`)) return;
+      buffer.push({ clientId, sectorId });
+      if (buffer.length >= BATCH) await flushCS();
     });
+    await flushCS();
   }
   console.log(`  ${csCreated} liens client-secteur traités`);
 
   // ── 8. Contacts (streaming) ───────────────────────────────────
   console.log('\n── 8. Migration des contacts ──');
-  let contactCreated = 0, contactUpdated = 0;
+  let contactCreated = 0;
   const contactFile = path.join(dir, TABLE_FILE_MAP['client_contacts']!);
   if (shouldRun('client_contacts') && fs.existsSync(contactFile)) {
+    const existingContacts = await prisma.clientContact.findMany({ select: { idClientCrm: true } });
+    const existingContactsSet = new Set(existingContacts.map(c => c.idClientCrm));
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+    const flushContacts = async () => {
+      if (buffer.length === 0) return;
+      await prisma.clientContact.createMany({ data: buffer, skipDuplicates: true });
+      contactCreated += buffer.length;
+      buffer = [];
+    };
+
     await streamTableRows(contactFile, 'client_contacts', async (c) => {
       const crmId = toInt(c.id);
       const clientCrmId = toInt(c.client_id);
       if (!crmId || !clientCrmId) return;
       const clientId = clientMap.get(clientCrmId);
       if (!clientId) return;
-
       const idClientCrm = `contact-${crmId}`;
       const nom = toStr(c.nom);
       if (!nom) return;
+      if (existingContactsSet.has(idClientCrm)) return;
 
       let contactTypeId: number | null = null;
       const crmTypeId = toInt(c.contact_type_id);
@@ -638,32 +684,40 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
         if (crmTypeName) contactTypeId = contactTypeByName.get(crmTypeName.toLowerCase()) || null;
       }
 
-      const data = {
-        clientId, civilite: toStr(c.civilite), nom,
+      buffer.push({
+        idClientCrm, clientId, civilite: toStr(c.civilite), nom,
         prenom: toStr(c.prenom), position: toStr(c.position),
         email: toStr(c.email), tel: toStr(c.tel),
         telephone2: toStr(c.telephone_2), contactTypeId,
         isPrimary: toBool(c.is_primary),
         createdAt: toDate(c.created) || new Date(),
-      };
-
-      const existing = await prisma.clientContact.findUnique({ where: { idClientCrm } });
-      if (existing) {
-        await prisma.clientContact.update({ where: { id: existing.id }, data });
-        contactUpdated++;
-      } else {
-        await prisma.clientContact.create({ data: { ...data, idClientCrm } });
-        contactCreated++;
-      }
+      });
+      if (buffer.length >= BATCH) await flushContacts();
     });
+    await flushContacts();
   }
-  console.log(`  ${contactCreated} créés, ${contactUpdated} mis à jour`);
+  console.log(`  ${contactCreated} créés`);
 
-  // ── 9. Devis (streaming) ──────────────────────────────────────
+  // ── 9. Devis (batch insert) ───────────────────────────────────
   console.log('\n── 9. Migration des devis ──');
-  let devisCreated = 0, devisUpdated = 0, devisCount = 0;
+  let devisCreated = 0, devisCount = 0;
   const devisFile = path.join(dir, TABLE_FILE_MAP['devis']!);
   if (shouldRun('devis') && fs.existsSync(devisFile)) {
+    // Charger les idDevisCrm déjà en DB pour éviter les doublons
+    const existingDevis = await prisma.devisRef.findMany({ select: { idDevisCrm: true } });
+    const existingDevisSet = new Set(existingDevis.map(d => d.idDevisCrm));
+    console.log(`  ${existingDevisSet.size} devis déjà en DB`);
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+
+    const flushDevis = async () => {
+      if (buffer.length === 0) return;
+      await prisma.devisRef.createMany({ data: buffer, skipDuplicates: true });
+      devisCreated += buffer.length;
+      buffer = [];
+    };
+
     await streamTableRows(devisFile, 'devis', async (d) => {
       devisCount++;
       const crmId = toInt(d.id);
@@ -672,40 +726,50 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
       if (toBool(d.is_model)) return;
       const clientId = clientMap.get(clientCrmId);
       if (!clientId) return;
-
       const idDevisCrm = String(crmId);
-      const commercialCrmId = toInt(d.ref_commercial_id);
-      const commercialNom = commercialCrmId ? (userMap.get(commercialCrmId) || null) : null;
+      if (existingDevisSet.has(idDevisCrm)) return;
 
-      const data = {
-        clientId, indent: toStr(d.indent), objet: toStr(d.objet),
+      const commercialCrmId = toInt(d.ref_commercial_id);
+      buffer.push({
+        idDevisCrm, clientId,
+        indent: toStr(d.indent), objet: toStr(d.objet),
         status: mapDevisStatus(toStr(d.status) || 'draft'),
         totalHt: toDecimal(d.total_ht), totalTtc: toDecimal(d.total_ttc),
         totalTva: toDecimal(d.total_tva), dateCreation: toDate(d.date_crea),
         dateValidite: toDate(d.date_validite), dateSignature: toDate(d.date_sign_before),
-        commercialId: commercialCrmId, commercialNom, note: toStr(d.note),
-      };
-
-      const existing = await prisma.devisRef.findUnique({ where: { idDevisCrm } });
-      if (existing) {
-        await prisma.devisRef.update({ where: { id: existing.id }, data });
-        devisUpdated++;
-      } else {
-        await prisma.devisRef.create({ data: { ...data, idDevisCrm } });
-        devisCreated++;
+        commercialId: commercialCrmId,
+        commercialNom: commercialCrmId ? (userMap.get(commercialCrmId) || null) : null,
+        note: toStr(d.note),
+      });
+      if (buffer.length >= BATCH) {
+        await flushDevis();
+        console.log(`  ${devisCount} devis traités...`);
       }
-
-      if (devisCount % 500 === 0) console.log(`  ${devisCount} devis traités...`);
     });
+    await flushDevis();
   }
-  console.log(`  ${devisCreated} créés, ${devisUpdated} mis à jour`);
+  console.log(`  ${devisCreated} créés (sur ${devisCount} lus)`);
 
-  // ── 10. Factures (streaming) → construit factureIndentMap ─────
+  // ── 10. Factures (batch insert) → construit factureIndentMap ──
   console.log('\n── 10. Migration des factures ──');
   const factureIndentMap = new Map<number, string>();
-  let factureCreated = 0, factureUpdated = 0;
+  let factureCreated = 0;
   const factureFile = path.join(dir, TABLE_FILE_MAP['devis_factures']!);
   if (shouldRun('devis_factures') && fs.existsSync(factureFile)) {
+    const existingFactures = await prisma.factureRef.findMany({ select: { idFactureCrm: true } });
+    const existingFacturesSet = new Set(existingFactures.map(f => f.idFactureCrm));
+    console.log(`  ${existingFacturesSet.size} factures déjà en DB`);
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+
+    const flushFactures = async () => {
+      if (buffer.length === 0) return;
+      await prisma.factureRef.createMany({ data: buffer, skipDuplicates: true });
+      factureCreated += buffer.length;
+      buffer = [];
+    };
+
     await streamTableRows(factureFile, 'devis_factures', async (f) => {
       const crmId = toInt(f.id);
       const clientCrmId = toInt(f.client_id);
@@ -714,44 +778,50 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
       const clientId = clientMap.get(clientCrmId);
       if (!clientId) return;
 
-      // Construire factureIndentMap pendant le stream
       const indent = toStr(f.indent);
       if (crmId && indent) factureIndentMap.set(crmId, indent);
 
       const idFactureCrm = String(crmId);
+      if (existingFacturesSet.has(idFactureCrm)) return;
+
       const commercialCrmId = toInt(f.ref_commercial_id);
-      const commercialNom = commercialCrmId ? (userMap.get(commercialCrmId) || null) : null;
       const reglInfo = factureReglements.get(crmId);
       const totalTtc = toDecimal(f.total_ttc) || 0;
-      const nbrReglement = reglInfo?.count || 0;
-      const restantDu = totalTtc - (reglInfo?.sum || 0);
-
-      const data = {
-        clientId, indent, objet: toStr(f.objet),
+      buffer.push({
+        idFactureCrm, clientId, indent, objet: toStr(f.objet),
         status: mapFactureStatus(toStr(f.status) || 'draft'),
         totalHt: toDecimal(f.total_ht), totalTtc: toDecimal(f.total_ttc),
         totalTva: toDecimal(f.total_tva), dateCreation: toDate(f.date_crea),
         dateEvenement: toDate(f.date_evenement),
-        restantDu: restantDu > 0 ? restantDu : 0, nbrReglement, commercialNom,
-      };
-
-      const existing = await prisma.factureRef.findUnique({ where: { idFactureCrm } });
-      if (existing) {
-        await prisma.factureRef.update({ where: { id: existing.id }, data });
-        factureUpdated++;
-      } else {
-        await prisma.factureRef.create({ data: { ...data, idFactureCrm } });
-        factureCreated++;
-      }
+        restantDu: Math.max(0, totalTtc - (reglInfo?.sum || 0)),
+        nbrReglement: reglInfo?.count || 0,
+        commercialNom: commercialCrmId ? (userMap.get(commercialCrmId) || null) : null,
+      });
+      if (buffer.length >= BATCH) await flushFactures();
     });
+    await flushFactures();
   }
-  console.log(`  ${factureCreated} créées, ${factureUpdated} mises à jour`);
+  console.log(`  ${factureCreated} créées`);
 
-  // ── 11. Avoirs (streaming) ────────────────────────────────────
+  // ── 11. Avoirs (batch insert) ─────────────────────────────────
   console.log('\n── 11. Migration des avoirs ──');
-  let avoirCreated = 0, avoirUpdated = 0;
+  let avoirCreated = 0;
   const avoirFile = path.join(dir, TABLE_FILE_MAP['avoirs']!);
   if (shouldRun('avoirs') && fs.existsSync(avoirFile)) {
+    const existingAvoirs = await prisma.avoirRef.findMany({ select: { idAvoirCrm: true } });
+    const existingAvoirsSet = new Set(existingAvoirs.map(a => a.idAvoirCrm));
+    console.log(`  ${existingAvoirsSet.size} avoirs déjà en DB`);
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+
+    const flushAvoirs = async () => {
+      if (buffer.length === 0) return;
+      await prisma.avoirRef.createMany({ data: buffer, skipDuplicates: true });
+      avoirCreated += buffer.length;
+      buffer = [];
+    };
+
     await streamTableRows(avoirFile, 'avoirs', async (a) => {
       const crmId = toInt(a.id);
       const clientCrmId = toInt(a.client_id);
@@ -759,73 +829,74 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
       if (toBool(a.is_model)) return;
       const clientId = clientMap.get(clientCrmId);
       if (!clientId) return;
-
       const idAvoirCrm = String(crmId);
+      if (existingAvoirsSet.has(idAvoirCrm)) return;
+
       const commercialCrmId = toInt(a.ref_commercial_id);
-      const commercialNom = commercialCrmId ? (userMap.get(commercialCrmId) || null) : null;
       const factureId = toInt(a.devis_facture_id);
-      const factureIndent = factureId ? (factureIndentMap.get(factureId) || null) : null;
       const reglInfo = avoirReglements.get(crmId);
       const totalTtc = toDecimal(a.total_ttc) || 0;
-      const nbrReglement = reglInfo?.count || 0;
-      const restantDu = totalTtc - (reglInfo?.sum || 0);
-
-      const data = {
-        clientId, indent: toStr(a.indent), objet: toStr(a.objet),
+      buffer.push({
+        idAvoirCrm, clientId,
+        indent: toStr(a.indent), objet: toStr(a.objet),
         status: mapAvoirStatus(toStr(a.status) || 'draft'),
         totalHt: toDecimal(a.total_ht), totalTtc: toDecimal(a.total_ttc),
         totalTva: toDecimal(a.total_tva), dateCreation: toDate(a.date_crea),
-        restantDu: restantDu > 0 ? restantDu : 0, nbrReglement, factureIndent, commercialNom,
-      };
-
-      const existing = await prisma.avoirRef.findUnique({ where: { idAvoirCrm } });
-      if (existing) {
-        await prisma.avoirRef.update({ where: { id: existing.id }, data });
-        avoirUpdated++;
-      } else {
-        await prisma.avoirRef.create({ data: { ...data, idAvoirCrm } });
-        avoirCreated++;
-      }
+        restantDu: Math.max(0, totalTtc - (reglInfo?.sum || 0)),
+        nbrReglement: reglInfo?.count || 0,
+        factureIndent: factureId ? (factureIndentMap.get(factureId) || null) : null,
+        commercialNom: commercialCrmId ? (userMap.get(commercialCrmId) || null) : null,
+      });
+      if (buffer.length >= BATCH) await flushAvoirs();
     });
+    await flushAvoirs();
   }
-  console.log(`  ${avoirCreated} créés, ${avoirUpdated} mis à jour`);
+  console.log(`  ${avoirCreated} créés`);
 
-  // ── 12. Règlements (streaming) ────────────────────────────────
+  // ── 12. Règlements (batch insert) ─────────────────────────────
   console.log('\n── 12. Migration des règlements ──');
-  let reglCreated = 0, reglUpdated = 0;
+  let reglCreated = 0;
   const reglFile = path.join(dir, TABLE_FILE_MAP['reglements']!);
   if (shouldRun('reglements') && fs.existsSync(reglFile)) {
+    const existingRegls = await prisma.reglementRef.findMany({ select: { idReglementCrm: true } });
+    const existingReglsSet = new Set(existingRegls.map(r => r.idReglementCrm));
+    console.log(`  ${existingReglsSet.size} règlements déjà en DB`);
+
+    const BATCH = 100;
+    let buffer: any[] = [];
+
+    const flushRegls = async () => {
+      if (buffer.length === 0) return;
+      await prisma.reglementRef.createMany({ data: buffer, skipDuplicates: true });
+      reglCreated += buffer.length;
+      buffer = [];
+    };
+
     await streamTableRows(reglFile, 'reglements', async (r) => {
       const crmId = toInt(r.id);
       const clientCrmId = toInt(r.client_id);
       if (!crmId || !clientCrmId) return;
       const clientId = clientMap.get(clientCrmId);
       if (!clientId) return;
-
       const idReglementCrm = String(crmId);
+      if (existingReglsSet.has(idReglementCrm)) return;
+
       const moyenId = toInt(r.moyen_reglement_id);
-      const moyenReglement = moyenId ? (moyenMap.get(moyenId) || null) : null;
       const userCrmId = toInt(r.user_id);
-      const commercialNom = userCrmId ? (userMap.get(userCrmId) || null) : null;
-
-      const data = {
-        clientId, type: mapReglementType(toStr(r.type) || 'credit'),
+      buffer.push({
+        idReglementCrm, clientId,
+        type: mapReglementType(toStr(r.type) || 'credit'),
         date: toDate(r.date), montant: toDecimal(r.montant),
-        moyenReglement, reference: toStr(r.reference),
-        note: toStr(r.note), etat: toStr(r.etat), commercialNom,
-      };
-
-      const existing = await prisma.reglementRef.findUnique({ where: { idReglementCrm } });
-      if (existing) {
-        await prisma.reglementRef.update({ where: { id: existing.id }, data });
-        reglUpdated++;
-      } else {
-        await prisma.reglementRef.create({ data: { ...data, idReglementCrm } });
-        reglCreated++;
-      }
+        moyenReglement: moyenId ? (moyenMap.get(moyenId) || null) : null,
+        reference: toStr(r.reference),
+        note: toStr(r.note), etat: toStr(r.etat),
+        commercialNom: userCrmId ? (userMap.get(userCrmId) || null) : null,
+      });
+      if (buffer.length >= BATCH) await flushRegls();
     });
+    await flushRegls();
   }
-  console.log(`  ${reglCreated} créés, ${reglUpdated} mis à jour`);
+  console.log(`  ${reglCreated} créés`);
 
   // ── Résumé ────────────────────────────────────────────────────
   console.log('\n══════════════════════════════════════');
@@ -835,13 +906,13 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
   console.log(`  Groupes:    ${groupeCreated} créés`);
   console.log(`  Sources:    ${sourceCreated} créées`);
   console.log(`  Secteurs:   ${secteurCreated} créés`);
-  console.log(`  Clients:    ${clientCreated} créés, ${clientUpdated} mis à jour`);
+  console.log(`  Clients:    ${clientCreated} créés`);
   console.log(`  Secteurs/C: ${csCreated} liens`);
-  console.log(`  Contacts:   ${contactCreated} créés, ${contactUpdated} mis à jour`);
-  console.log(`  Devis:      ${devisCreated} créés, ${devisUpdated} mis à jour`);
-  console.log(`  Factures:   ${factureCreated} créées, ${factureUpdated} mises à jour`);
-  console.log(`  Avoirs:     ${avoirCreated} créés, ${avoirUpdated} mis à jour`);
-  console.log(`  Règlements: ${reglCreated} créés, ${reglUpdated} mis à jour`);
+  console.log(`  Contacts:   ${contactCreated} créés`);
+  console.log(`  Devis:      ${devisCreated} créés`);
+  console.log(`  Factures:   ${factureCreated} créées`);
+  console.log(`  Avoirs:     ${avoirCreated} créés`);
+  console.log(`  Règlements: ${reglCreated} créés`);
   console.log('══════════════════════════════════════\n');
 }
 
@@ -1019,7 +1090,7 @@ async function migrateFromFile(fullPath: string) {
     else { const created = await prisma.client.create({ data: { ...data, idClientCrm } }); clientMap.set(crmId, created.id); clientCreated++; }
     if ((i + 1) % 100 === 0) console.log(`  ${i + 1}/${clientRows.length} clients traités`);
   }
-  console.log(`  ${clientCreated} créés, ${clientUpdated} mis à jour, ${clientSkipped} ignorés`);
+  console.log(`  ${clientCreated} créés, ${clientSkipped} ignorés`);
 
   // ── 7. Secteurs par client ──
   console.log('\n── 7. Migration des secteurs par client ──');
@@ -1189,13 +1260,13 @@ async function migrateFromFile(fullPath: string) {
   console.log(`  Groupes:    ${groupeCreated} créés`);
   console.log(`  Sources:    ${sourceCreated} créées`);
   console.log(`  Secteurs:   ${secteurCreated} créés`);
-  console.log(`  Clients:    ${clientCreated} créés, ${clientUpdated} mis à jour`);
+  console.log(`  Clients:    ${clientCreated} créés`);
   console.log(`  Secteurs/C: ${csCreated} liens`);
-  console.log(`  Contacts:   ${contactCreated} créés, ${contactUpdated} mis à jour`);
-  console.log(`  Devis:      ${devisCreated} créés, ${devisUpdated} mis à jour`);
-  console.log(`  Factures:   ${factureCreated} créées, ${factureUpdated} mises à jour`);
-  console.log(`  Avoirs:     ${avoirCreated} créés, ${avoirUpdated} mis à jour`);
-  console.log(`  Règlements: ${reglCreated} créés, ${reglUpdated} mis à jour`);
+  console.log(`  Contacts:   ${contactCreated} créés`);
+  console.log(`  Devis:      ${devisCreated} créés`);
+  console.log(`  Factures:   ${factureCreated} créées`);
+  console.log(`  Avoirs:     ${avoirCreated} créés`);
+  console.log(`  Règlements: ${reglCreated} créés`);
   console.log('══════════════════════════════════════\n');
 }
 

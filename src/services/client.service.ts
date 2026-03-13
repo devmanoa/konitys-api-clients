@@ -144,9 +144,9 @@ class ClientService {
     const client = await prisma.client.create({
       data: {
         ...clientData,
-        sectors: sectorIds?.length
+        sectors: sectorIds?.filter((s): s is number => s != null).length
           ? {
-              create: sectorIds.map((sectorId) => ({
+              create: sectorIds.filter((s): s is number => s != null).map((sectorId) => ({
                 sectorId,
               })),
             }
@@ -184,9 +184,10 @@ class ClientService {
     // Update sectors if provided
     if (sectorIds !== undefined) {
       await prisma.clientSector.deleteMany({ where: { clientId: id } });
-      if (sectorIds.length > 0) {
+      const validSectorIds = sectorIds.filter((s): s is number => s != null);
+      if (validSectorIds.length > 0) {
         await prisma.clientSector.createMany({
-          data: sectorIds.map((sectorId) => ({
+          data: validSectorIds.map((sectorId) => ({
             clientId: id,
             sectorId,
           })),
