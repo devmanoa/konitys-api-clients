@@ -7,6 +7,7 @@ const RABBITMQ_VHOST = process.env.RABBITMQ_VHOST || '/';
 const RABBITMQ_USER = process.env.RABBITMQ_USER || 'guest';
 const RABBITMQ_PASS = process.env.RABBITMQ_PASS || 'guest';
 const EXCHANGE = process.env.RABBITMQ_EXCHANGE || 'konitysevents';
+const APP_NAME = process.env.APP_NAME || 'unknown';
 
 let connection: amqp.ChannelModel | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -89,6 +90,7 @@ async function publish(routingKey: string, payload: Record<string, any>): Promis
 
   const message = JSON.stringify({
     event: routingKey,
+    source: APP_NAME,
     timestamp: new Date().toISOString(),
     data: payload,
   });
