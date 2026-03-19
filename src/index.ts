@@ -10,6 +10,10 @@ import { errorMiddleware } from './middleware/error.middleware';
 import { logger } from './utils/logger';
 import { rabbitmq } from './utils/rabbitmq';
 import { startDevisConsumer } from './consumers/devis.consumer';
+import { startFactureConsumer } from './consumers/facture.consumer';
+import { startAvoirConsumer } from './consumers/avoir.consumer';
+import { startReglementConsumer } from './consumers/reglement.consumer';
+import { startContactConsumer } from './consumers/contact.consumer';
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -65,6 +69,10 @@ server.listen(PORT, async () => {
   logger.info(`API endpoint: http://localhost:${PORT}/api/clients`);
   await rabbitmq.connect();
   await startDevisConsumer();
+  await startFactureConsumer();
+  await startAvoirConsumer();
+  await startReglementConsumer();
+  await startContactConsumer();
 });
 
 // Graceful shutdown
