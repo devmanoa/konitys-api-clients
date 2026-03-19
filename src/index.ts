@@ -14,6 +14,7 @@ import { startFactureConsumer } from './consumers/facture.consumer';
 import { startAvoirConsumer } from './consumers/avoir.consumer';
 import { startReglementConsumer } from './consumers/reglement.consumer';
 import { startContactConsumer } from './consumers/contact.consumer';
+import { startClientConsumer } from './consumers/client.consumer';
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -73,6 +74,7 @@ server.listen(PORT, async () => {
   await startAvoirConsumer();
   await startReglementConsumer();
   await startContactConsumer();
+  await startClientConsumer();
 });
 
 // Graceful shutdown
