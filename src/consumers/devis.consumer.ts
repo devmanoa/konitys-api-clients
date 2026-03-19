@@ -31,6 +31,7 @@ async function handleDevisEvent(routingKey: string, message: any) {
   }
 
   const idDevisCrm = String(entity_id);
+  logger.info(`[DevisConsumer] Received: entity_id=${entity_id}, payload=${JSON.stringify(payload)}`);
 
   // Find the client by their CRM id
   const client = payload.client_id
@@ -47,8 +48,8 @@ async function handleDevisEvent(routingKey: string, message: any) {
     indent: payload.indent || null,
     objet: payload.objet || null,
     status: mapStatus(payload.status),
-    totalHt: payload.montant_ht != null ? parseFloat(payload.montant_ht) : null,
-    totalTtc: payload.montant_ttc != null ? parseFloat(payload.montant_ttc) : null,
+    totalHt: payload.montant_ht != null ? String(payload.montant_ht) : null,
+    totalTtc: payload.montant_ttc != null ? String(payload.montant_ttc) : null,
     dateCreation: payload.date_crea ? new Date(payload.date_crea) : null,
   };
 
