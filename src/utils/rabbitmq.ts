@@ -7,7 +7,10 @@ const RABBITMQ_VHOST = process.env.RABBITMQ_VHOST || '/';
 const RABBITMQ_USER = process.env.RABBITMQ_USER || 'guest';
 const RABBITMQ_PASS = process.env.RABBITMQ_PASS || 'guest';
 const EXCHANGE = process.env.RABBITMQ_EXCHANGE || 'konitysevents';
+const CRM_EXCHANGE = process.env.CRM_EXCHANGE || 'konitysevents';
 const APP_NAME = process.env.APP_NAME || 'unknown';
+
+type MessageHandler = (routingKey: string, message: any) => Promise<void>;
 
 let connection: amqp.ChannelModel | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -121,6 +124,42 @@ async function publish(routingKey: string, payload: Record<string, any>): Promis
   }
 }
 
+async function subscribe(
+  exchangeName: string,
+  bindingPattern: string,
+  queueName: string,
+  handler: MessageHandler
+): Promise<void> {
+  if (!connection) {
+    logger.warn(`[RabbitMQ] Not connected — cannot subscribe to ${queueName}`);
+    return;
+  }
+
+  try {
+    const ch = await connection.createChannel();
+    await ch.assertExchange(exchangeName, 'topic', { durable: true });
+    await ch.assertQueue(queueName, { durable: true });
+    await ch.bindQueue(queueName, exchangeName, bindingPattern);
+    await ch.prefetch(1);
+
+    ch.consume(queueName, async (msg) => {
+      if (!msg) return;
+      try {
+        const content = JSON.parse(msg.content.toString());
+        await handler(msg.fields.routingKey, content);
+        ch.ack(msg);
+      } catch (err: any) {
+        logger.error(`[RabbitMQ] Handler error (${msg.fields.routingKey}):`, err.message);
+        ch.nack(msg, false, false); // dead-letter, don't requeue
+      }
+    });
+
+    logger.info(`[RabbitMQ] Subscribed: queue="${queueName}" binding="${bindingPattern}" on exchange="${exchangeName}"`);
+  } catch (err: any) {
+    logger.error(`[RabbitMQ] Subscribe failed (${queueName}):`, err.message);
+  }
+}
+
 async function close(): Promise<void> {
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
@@ -135,4 +174,5 @@ async function close(): Promise<void> {
   logger.info('[RabbitMQ] Disconnected');
 }
 
-export const rabbitmq = { connect, publish, close };
+export { CRM_EXCHANGE };
+export const rabbitmq = { connect, publish, subscribe, close };

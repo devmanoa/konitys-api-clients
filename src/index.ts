@@ -9,6 +9,7 @@ import { router } from './routes';
 import { errorMiddleware } from './middleware/error.middleware';
 import { logger } from './utils/logger';
 import { rabbitmq } from './utils/rabbitmq';
+import { startDevisConsumer } from './consumers/devis.consumer';
 
 const app = express();
 const PORT = process.env.PORT || 3004;
@@ -63,6 +64,7 @@ server.listen(PORT, async () => {
   logger.info(`Health check: http://localhost:${PORT}/health`);
   logger.info(`API endpoint: http://localhost:${PORT}/api/clients`);
   await rabbitmq.connect();
+  await startDevisConsumer();
 });
 
 // Graceful shutdown
