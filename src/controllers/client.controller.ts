@@ -32,13 +32,27 @@ class ClientController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { page, limit } = parsePagination(req.query as Record<string, any>);
+      // Le tri va directement dans orderBy : on n'accepte que des colonnes
+      // connues, sinon un sortBy arbitraire fait remonter une erreur Prisma.
       const sortByParam = (req.query.sortBy as string) || 'createdAt';
       const sortByMap: Record<string, string> = {
         created_at: 'createdAt',
+        createdAt: 'createdAt',
         updated_at: 'updatedAt',
+        updatedAt: 'updatedAt',
+        contact_raison: 'contactRaison',
+        contactRaison: 'contactRaison',
+        nom: 'nom',
+        prenom: 'prenom',
+        enseigne: 'enseigne',
+        email: 'email',
+        ville: 'ville',
+        departement: 'departement',
+        telephone: 'telephone',
+        codeQuadra: 'codeQuadra',
       };
-      const sortBy = sortByMap[sortByParam] || sortByParam;
-      const sortOrder = (req.query.sortOrder as 'asc' | 'desc') || 'desc';
+      const sortBy = sortByMap[sortByParam] || 'createdAt';
+      const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
       const filters: ClientFilters = {
         key: req.query.key as string,
