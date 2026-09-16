@@ -4,6 +4,67 @@ import { buildPaginationResult, PaginationResult } from '../utils/pagination';
 import { NotFoundError, ValidationError } from '../utils/errors';
 import { rabbitmq } from '../utils/rabbitmq';
 
+export interface AddressInput {
+  label?: string | null;
+  adresse?: string | null;
+  adresse2?: string | null;
+  cp?: string | null;
+  ville?: string | null;
+  paysId?: number | null;
+  departement?: string | null;
+  isPrimary?: boolean;
+}
+
+const trimOrNull = (v: unknown): string | null => {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return s === '' ? null : s;
+};
+
+/**
+ * Nettoie la liste d'adresses envoyée par le formulaire : on écarte les lignes
+ * entièrement vides et on garantit exactement une adresse principale (la
+ * première si aucune n'est marquée), pour ne pas laisser le client sans
+ * adresse par défaut.
+ */
+function normalizeAddresses(addresses?: AddressInput[]): AddressInput[] {
+  if (!Array.isArray(addresses)) return [];
+
+  const cleaned = addresses
+    .filter((a) => a && typeof a === 'object')
+    .map((a) => ({
+      label: trimOrNull(a.label),
+      adresse: trimOrNull(a.adresse),
+      adresse2: trimOrNull(a.adresse2),
+      cp: trimOrNull(a.cp),
+      ville: trimOrNull(a.ville),
+      paysId: a.paysId ?? null,
+      isPrimary: a.isPrimary === true,
+    }))
+    .filter((a) => a.adresse || a.cp || a.ville || a.label);
+
+  if (cleaned.length === 0) return [];
+
+  const primaryIndex = cleaned.findIndex((a) => a.isPrimary);
+  const keep = primaryIndex === -1 ? 0 : primaryIndex;
+  return cleaned.map((a, i) => ({ ...a, isPrimary: i === keep }));
+}
+
+/**
+ * Recopie l'adresse principale dans les colonnes de `clients`. Ces champs
+ * restent la source du filtre par département et de l'affichage condensé,
+ * donc les deux doivent rester cohérents.
+ */
+function legacyAddressFields(addresses: AddressInput[]): Record<string, unknown> {
+  const primary = addresses.find((a) => a.isPrimary);
+  if (!primary) return {};
+  return {
+    adresse: primary.adresse ?? null,
+    adresse2: primary.adresse2 ?? null,
+    cp: primary.cp ?? null,
+    ville: primary.ville ?? null,
+  };
+}
+
 export interface ClientFilters {
   key?: string;
   clientType?: ClientType;
@@ -138,12 +199,16 @@ class ClientService {
     return client;
   }
 
-  async create(data: Prisma.ClientCreateInput & { sectorIds?: number[] }) {
-    const { sectorIds, ...clientData } = data;
+  async create(data: Prisma.ClientCreateInput & { sectorIds?: number[]; addresses?: AddressInput[] }) {
+    const { sectorIds, addresses, ...clientData } = data;
+    const cleanAddresses = normalizeAddresses(addresses);
 
     const client = await prisma.client.create({
       data: {
         ...clientData,
+        // L'adresse principale alimente aussi les colonnes portées par `clients` :
+        // la liste et son filtre par département lisent encore celles-ci.
+        ...legacyAddressFields(cleanAddresses),
         sectors: sectorIds?.filter((s): s is number => s != null).length
           ? {
               create: sectorIds.filter((s): s is number => s != null).map((sectorId) => ({
@@ -151,6 +216,7 @@ class ClientService {
               })),
             }
           : undefined,
+        addresses: cleanAddresses.length ? { create: cleanAddresses } : undefined,
       },
       include: {
         groupeClient: true,
@@ -171,7 +237,7 @@ class ClientService {
     return client;
   }
 
-  async update(id: number, data: Prisma.ClientUpdateInput & { sectorIds?: number[] }) {
+  async update(id: number, data: Prisma.ClientUpdateInput & { sectorIds?: number[]; addresses?: AddressInput[] }) {
     const existing = await prisma.client.findFirst({
       where: { id, isDeleted: false },
     });
@@ -179,7 +245,20 @@ class ClientService {
       throw new NotFoundError('Client');
     }
 
-    const { sectorIds, ...clientData } = data;
+    const { sectorIds, addresses, ...clientData } = data;
+
+    // Remplacement intégral, comme pour les secteurs : le formulaire envoie
+    // l'état complet de la liste. Champ absent = on n'y touche pas.
+    if (addresses !== undefined) {
+      const cleanAddresses = normalizeAddresses(addresses);
+      await prisma.clientAddress.deleteMany({ where: { clientId: id } });
+      if (cleanAddresses.length > 0) {
+        await prisma.clientAddress.createMany({
+          data: cleanAddresses.map((a) => ({ ...a, clientId: id })),
+        });
+      }
+      Object.assign(clientData, legacyAddressFields(cleanAddresses));
+    }
 
     // Update sectors if provided
     if (sectorIds !== undefined) {

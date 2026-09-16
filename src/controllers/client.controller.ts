@@ -28,6 +28,20 @@ function mapClientBody(body: Record<string, any>): Record<string, any> {
   };
 }
 
+/** Les adresses arrivent du formulaire en snake_case, comme le reste du corps. */
+function mapAddresses(addresses: unknown): Record<string, any>[] | undefined {
+  if (!Array.isArray(addresses)) return undefined;
+  return addresses.map((a: Record<string, any>) => ({
+    label: a?.label,
+    adresse: a?.adresse,
+    adresse2: a?.adresse2 ?? a?.adresse_2,
+    cp: a?.cp,
+    ville: a?.ville,
+    paysId: a?.paysId ?? a?.pays_id,
+    isPrimary: a?.isPrimary ?? a?.is_primary,
+  }));
+}
+
 class ClientController {
   async getAll(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
@@ -99,13 +113,14 @@ class ClientController {
 
   async create(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
-      const { sectorIds, ...rawData } = req.body;
+      const { sectorIds, addresses, ...rawData } = req.body;
       const clientData = mapClientBody(rawData);
 
       const client = await clientService.create({
         ...clientData,
         createdBy: req.user?.sub ? parseInt(req.user.sub) : undefined,
         sectorIds,
+        addresses: mapAddresses(addresses),
       } as any);
 
       res.status(201).json({
@@ -120,13 +135,14 @@ class ClientController {
   async update(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const id = parseInt(req.params.id);
-      const { sectorIds, ...rawData } = req.body;
+      const { sectorIds, addresses, ...rawData } = req.body;
       const clientData = mapClientBody(rawData);
 
       const client = await clientService.update(id, {
         ...clientData,
         updatedBy: req.user?.sub ? parseInt(req.user.sub) : undefined,
         sectorIds,
+        addresses: mapAddresses(addresses),
       } as any);
 
       res.json({
