@@ -1,6 +1,8 @@
 import { Response, NextFunction } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 import { clientService, ClientFilters } from '../services/client.service';
+import { clientMergeService } from '../services/client-merge.service';
+import { ValidationError } from '../utils/errors';
 import { parsePagination } from '../utils/pagination';
 import { ClientType, TypeCommercial } from '@prisma/client';
 
@@ -26,6 +28,12 @@ function mapClientBody(body: Record<string, any>): Record<string, any> {
     ...(pays_id !== undefined && { pays: pays_id ? { connect: { id: pays_id } } : { disconnect: true } }),
     ...(code_quadra !== undefined && { codeQuadra: code_quadra }),
   };
+}
+
+function parseMergeId(raw: unknown, label: string): number {
+  const id = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+  if (!Number.isInteger(id) || id <= 0) throw new ValidationError(`${label} invalide`);
+  return id;
 }
 
 /** Les adresses arrivent du formulaire en snake_case, comme le reste du corps. */
@@ -186,12 +194,41 @@ class ClientController {
   async getDuplicates(req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
       const { page, limit } = parsePagination(req.query as Record<string, any>);
-      const duplicates = await clientService.findDuplicates(page, limit);
+      const result = await clientService.findDuplicates(page, limit);
 
       res.json({
         success: true,
-        data: duplicates,
+        data: result.data,
+        pagination: result.pagination,
       });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async mergePreview(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const primaryId = parseMergeId(req.params.id, 'Identifiant du client principal');
+      const duplicateId = parseMergeId(req.params.duplicateId, 'Identifiant du doublon');
+
+      const preview = await clientMergeService.preview(primaryId, duplicateId);
+      res.json({ success: true, data: preview });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async merge(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const primaryId = parseMergeId(req.params.id, 'Identifiant du client principal');
+      const duplicateId = parseMergeId(req.body?.duplicateId, 'Identifiant du doublon');
+
+      const result = await clientMergeService.merge(
+        primaryId,
+        duplicateId,
+        req.user?.sub ? parseInt(req.user.sub) : undefined,
+      );
+      res.json({ success: true, data: result });
     } catch (error) {
       next(error);
     }

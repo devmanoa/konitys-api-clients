@@ -9,6 +9,8 @@ router.get('/', clientController.getAll);
 router.get('/search', clientController.search);
 router.get('/duplicates', clientController.getDuplicates);
 router.post('/bulk-action', requireRole(...WRITE_ROLES), clientController.bulkAction);
+router.get('/:id/merge-preview/:duplicateId', clientController.mergePreview);
+router.post('/:id/merge', requireRole(...WRITE_ROLES), clientController.merge);
 router.get('/:id', clientController.getById);
 router.post('/', requireRole(...WRITE_ROLES), clientController.create);
 router.put('/:id', requireRole(...WRITE_ROLES), clientController.update);

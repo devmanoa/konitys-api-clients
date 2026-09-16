@@ -359,23 +359,73 @@ class ClientService {
     const safePage = Math.max(1, Math.trunc(Number(page)) || 1);
     const offset = (safePage - 1) * safeLimit;
 
-    // Find clients with same nom+email or same enseigne
-    const duplicates = await prisma.$queryRaw<any[]>`
-      SELECT c1.id, c1.nom, c1.prenom, c1.enseigne, c1.email, c1.telephone, c1.ville, c1.client_type,
-             c2.id as duplicate_id, c2.nom as duplicate_nom, c2.prenom as duplicate_prenom,
-             c2.enseigne as duplicate_enseigne, c2.email as duplicate_email
+    // Paires de clients qui se ressemblent : même nom (pro) ou même email.
+    // c1.id < c2.id évite de sortir chaque paire deux fois.
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        c1.id            AS left_id,
+        c1.nom           AS left_nom,
+        c1.prenom        AS left_prenom,
+        c1.enseigne      AS left_enseigne,
+        c1.email         AS left_email,
+        c1.telephone     AS left_telephone,
+        c1.ville         AS left_ville,
+        c1.client_type   AS left_client_type,
+        c1.created_at    AS left_created_at,
+        c2.id            AS right_id,
+        c2.nom           AS right_nom,
+        c2.prenom        AS right_prenom,
+        c2.enseigne      AS right_enseigne,
+        c2.email         AS right_email,
+        c2.telephone     AS right_telephone,
+        c2.ville         AS right_ville,
+        c2.client_type   AS right_client_type,
+        c2.created_at    AS right_created_at,
+        CASE
+          WHEN c1.email IS NOT NULL AND c1.email <> '' AND LOWER(c1.email) = LOWER(c2.email)
+          THEN 'email' ELSE 'nom'
+        END AS reason
       FROM clients c1
       JOIN clients c2 ON c1.id < c2.id
         AND c1.is_deleted = false AND c2.is_deleted = false
         AND (
-          (LOWER(c1.nom) = LOWER(c2.nom) AND c1.nom != '' AND c1.client_type = 'corporation')
-          OR (c1.email = c2.email AND c1.email != '' AND c1.email IS NOT NULL)
+          (LOWER(c1.nom) = LOWER(c2.nom) AND c1.nom <> '' AND c1.client_type = 'corporation'
+            AND c2.client_type = 'corporation')
+          OR (LOWER(c1.email) = LOWER(c2.email) AND c1.email <> '' AND c1.email IS NOT NULL)
         )
-      ORDER BY c1.nom ASC
+      ORDER BY c1.nom ASC, c1.id ASC, c2.id ASC
       LIMIT ${safeLimit} OFFSET ${offset}
     `;
 
-    return duplicates;
+    // Compte total des paires, pour paginer côté client.
+    const [{ count }] = await prisma.$queryRaw<[{ count: bigint }]>`
+      SELECT COUNT(*)::bigint AS count
+      FROM clients c1
+      JOIN clients c2 ON c1.id < c2.id
+        AND c1.is_deleted = false AND c2.is_deleted = false
+        AND (
+          (LOWER(c1.nom) = LOWER(c2.nom) AND c1.nom <> '' AND c1.client_type = 'corporation'
+            AND c2.client_type = 'corporation')
+          OR (LOWER(c1.email) = LOWER(c2.email) AND c1.email <> '' AND c1.email IS NOT NULL)
+        )
+    `;
+
+    const pair = (r: any, side: 'left' | 'right') => ({
+      id: Number(r[`${side}_id`]),
+      nom: r[`${side}_nom`],
+      prenom: r[`${side}_prenom`],
+      enseigne: r[`${side}_enseigne`],
+      email: r[`${side}_email`],
+      telephone: r[`${side}_telephone`],
+      ville: r[`${side}_ville`],
+      clientType: r[`${side}_client_type`],
+      createdAt: r[`${side}_created_at`],
+    });
+
+    return {
+      data: rows.map((r) => ({ reason: r.reason, left: pair(r, 'left'), right: pair(r, 'right') })),
+      pagination: buildPaginationResult(safePage, safeLimit, Number(count)),
+    };
   }
 
   async bulkDelete(ids: number[]) {
