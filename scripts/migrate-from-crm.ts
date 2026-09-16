@@ -509,7 +509,8 @@ async function migrateFromDirectory(dir: string, only: Set<FilterableTable> | nu
   for (const s of secteurRows) {
     const crmId = toInt(s.id);
     if (!crmId) continue;
-    const nom = toStr(s.nom) || `Secteur ${crmId}`;
+    // Le dump CRM nomme cette colonne `name` (et non `nom` comme groupe_clients).
+    const nom = toStr(s.nom) || toStr(s.name) || `Secteur ${crmId}`;
     let existing = await prisma.secteurActivite.findFirst({ where: { nom } });
     if (existing) {
       secteurMap.set(crmId, existing.id);
@@ -1044,7 +1045,8 @@ async function migrateFromFile(fullPath: string) {
   for (const s of secteurRows) {
     const crmId = toInt(s.id);
     if (!crmId) continue;
-    const nom = toStr(s.nom) || `Secteur ${crmId}`;
+    // Le dump CRM nomme cette colonne `name` (et non `nom` comme groupe_clients).
+    const nom = toStr(s.nom) || toStr(s.name) || `Secteur ${crmId}`;
     let existing = await prisma.secteurActivite.findFirst({ where: { nom } });
     if (existing) { secteurMap.set(crmId, existing.id); }
     else { const c = await prisma.secteurActivite.create({ data: { nom } }); secteurMap.set(crmId, c.id); secteurCreated++; }

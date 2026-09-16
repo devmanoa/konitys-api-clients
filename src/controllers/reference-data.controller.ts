@@ -5,9 +5,12 @@ import { prisma } from '../utils/prisma';
 class ReferenceDataController {
   async getSectors(_req: AuthenticatedRequest, res: Response, next: NextFunction) {
     try {
+      // Pas d'include { children } : le référentiel est plat aujourd'hui
+      // (aucune ligne ne porte de parentId), le JOIN ne renvoyait que des
+      // tableaux vides. Le schéma garde la relation si l'on veut regrouper
+      // les secteurs plus tard.
       const sectors = await prisma.secteurActivite.findMany({
         orderBy: { nom: 'asc' },
-        include: { children: true },
       });
       res.json({ success: true, data: sectors });
     } catch (error) {
