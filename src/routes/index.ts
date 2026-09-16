@@ -8,6 +8,7 @@ import reglementRefRoutes from './reglement-ref.routes';
 import factureRefRoutes from './facture-ref.routes';
 import avoirRefRoutes from './avoir-ref.routes';
 import referenceDataRoutes from './reference-data.routes';
+import sectorRoutes from './sector.routes';
 
 export const router = Router();
 
@@ -22,3 +23,6 @@ router.use('/clients', reglementRefRoutes);
 router.use('/clients', factureRefRoutes);
 router.use('/clients', avoirRefRoutes);
 router.use('/reference-data', referenceDataRoutes);
+// CRUD du référentiel des secteurs. GET /reference-data/sectors reste en place
+// pour les formulaires clients ; ces routes-ci servent l'écran d'administration.
+router.use('/sectors', sectorRoutes);
