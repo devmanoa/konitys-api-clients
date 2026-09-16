@@ -2,6 +2,8 @@ import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
 import { commentController } from '../controllers/comment.controller';
+import { requireRole } from '../middleware/auth.middleware';
+import { WRITE_ROLES } from '../utils/roles';
 
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
 
@@ -41,7 +43,7 @@ const upload = multer({
 const router = Router();
 
 router.get('/:clientId/comments', commentController.getByClientId);
-router.post('/:clientId/comments', upload.array('files', 5), commentController.create);
-router.delete('/:clientId/comments/:id', commentController.delete);
+router.post('/:clientId/comments', requireRole(...WRITE_ROLES), upload.array('files', 5), commentController.create);
+router.delete('/:clientId/comments/:id', requireRole(...WRITE_ROLES), commentController.delete);
 
 export default router;

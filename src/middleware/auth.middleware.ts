@@ -1,9 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import jwksRsa from 'jwks-rsa';
+import { logger } from '../utils/logger';
 
 const keycloakUrl = process.env.KEYCLOAK_URL || 'http://localhost:8080';
 const keycloakRealm = process.env.KEYCLOAK_REALM || 'konitys';
+
+// Auth bypass is only ever allowed outside production. If DISABLE_AUTH is set
+// in production we fail fast at boot rather than silently serving every request
+// as an admin dev-user.
+const authDisabled = process.env.DISABLE_AUTH === 'true';
+if (authDisabled && process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'DISABLE_AUTH=true is forbidden when NODE_ENV=production — refusing to start with authentication disabled.',
+  );
+}
 
 const jwksClient = jwksRsa({
   jwksUri: `${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/certs`,
@@ -42,8 +53,8 @@ export const authMiddleware = (
   res: Response,
   next: NextFunction,
 ) => {
-  // Skip auth if disabled via env
-  if (process.env.DISABLE_AUTH === 'true') {
+  // Skip auth if disabled via env (non-production only — enforced at boot above)
+  if (authDisabled) {
     req.user = { sub: 'dev-user', email: 'dev@local', preferred_username: 'dev' };
     return next();
   }
@@ -68,7 +79,12 @@ export const authMiddleware = (
     },
     (err, decoded) => {
       if (err) {
-        console.error('JWT verification error:', err.message);
+        // Don't leak the specific JWT failure reason to logs in production.
+        if (process.env.NODE_ENV !== 'production') {
+          logger.warn(`[Auth] JWT verification failed: ${err.message}`);
+        } else {
+          logger.warn('[Auth] JWT verification failed');
+        }
         return res.status(401).json({
           success: false,
           error: 'Token invalide ou expiré',
@@ -79,4 +95,27 @@ export const authMiddleware = (
       next();
     },
   );
+};
+
+/**
+ * Authorization middleware: requires the authenticated user to hold at least one
+ * of the given Keycloak realm roles. Must run after `authMiddleware`.
+ * When auth is disabled (dev), the injected dev-user passes through.
+ */
+export const requireRole = (...roles: string[]) => {
+  return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+    if (authDisabled) return next();
+
+    const userRoles = req.user?.realm_access?.roles ?? [];
+    const allowed = roles.some((role) => userRoles.includes(role));
+
+    if (!allowed) {
+      return res.status(403).json({
+        success: false,
+        error: 'Accès interdit : rôle insuffisant',
+      });
+    }
+
+    next();
+  };
 };

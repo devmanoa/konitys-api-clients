@@ -68,9 +68,9 @@ class FactureRefService {
   }
 
   async delete(id: number, clientId: number) {
-    const existing = await prisma.factureRef.findFirst({ where: { id, clientId } });
-    if (!existing) throw new NotFoundError('FactureRef');
-    return prisma.factureRef.delete({ where: { id } });
+    const result = await prisma.factureRef.deleteMany({ where: { id, clientId } });
+    if (result.count === 0) throw new NotFoundError('FactureRef');
+    return result;
   }
 }
 

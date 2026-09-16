@@ -29,8 +29,13 @@ if (!fs.existsSync(uploadDir)) {
 app.use(helmet());
 
 const corsOrigins = process.env.CORS_ORIGINS;
+if (!corsOrigins) {
+  logger.warn('[CORS] CORS_ORIGINS not set — denying all cross-origin requests by default');
+}
 app.use(cors({
-  origin: corsOrigins ? corsOrigins.split(',').map((o) => o.trim()) : true,
+  // Deny by default when no explicit allow-list is configured. Combined with
+  // credentials:true, a permissive `true` would be a CSRF/exfiltration risk.
+  origin: corsOrigins ? corsOrigins.split(',').map((o) => o.trim()) : false,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));

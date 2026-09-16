@@ -72,9 +72,11 @@ class DevisRefService {
   }
 
   async delete(id: number, clientId: number) {
-    const existing = await prisma.devisRef.findFirst({ where: { id, clientId } });
-    if (!existing) throw new NotFoundError('DevisRef');
-    return prisma.devisRef.delete({ where: { id } });
+    // Scope the delete by clientId too, so the mutation can never touch a row
+    // belonging to another client even under a race with the check above.
+    const result = await prisma.devisRef.deleteMany({ where: { id, clientId } });
+    if (result.count === 0) throw new NotFoundError('DevisRef');
+    return result;
   }
 }
 

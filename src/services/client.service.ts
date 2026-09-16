@@ -273,6 +273,13 @@ class ClientService {
   }
 
   async findDuplicates(page: number, limit: number) {
+    // Coerce to safe integers. $queryRaw already parameterizes ${} placeholders
+    // (they are bound, not string-interpolated), but we harden the inputs so a
+    // future caller passing unbounded/non-numeric values can't change that.
+    const safeLimit = Math.min(100, Math.max(1, Math.trunc(Number(limit)) || 20));
+    const safePage = Math.max(1, Math.trunc(Number(page)) || 1);
+    const offset = (safePage - 1) * safeLimit;
+
     // Find clients with same nom+email or same enseigne
     const duplicates = await prisma.$queryRaw<any[]>`
       SELECT c1.id, c1.nom, c1.prenom, c1.enseigne, c1.email, c1.telephone, c1.ville, c1.client_type,
@@ -286,7 +293,7 @@ class ClientService {
           OR (c1.email = c2.email AND c1.email != '' AND c1.email IS NOT NULL)
         )
       ORDER BY c1.nom ASC
-      LIMIT ${limit} OFFSET ${(page - 1) * limit}
+      LIMIT ${safeLimit} OFFSET ${offset}
     `;
 
     return duplicates;

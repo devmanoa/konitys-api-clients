@@ -32,12 +32,13 @@ class CommentController {
         userName,
       });
 
-      // Handle file uploads if present
+      // Handle file uploads if present. Store only the stored filename, never the
+      // absolute disk path — the path is reconstructed server-side when serving.
       if (req.files && Array.isArray(req.files)) {
         for (const file of req.files) {
           await commentService.addAttachment(comment.id, {
             fileName: file.originalname,
-            filePath: file.path,
+            filePath: file.filename,
             fileSize: file.size,
             mimeType: file.mimetype,
           });

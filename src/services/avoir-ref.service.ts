@@ -66,9 +66,9 @@ class AvoirRefService {
   }
 
   async delete(id: number, clientId: number) {
-    const existing = await prisma.avoirRef.findFirst({ where: { id, clientId } });
-    if (!existing) throw new NotFoundError('AvoirRef');
-    return prisma.avoirRef.delete({ where: { id } });
+    const result = await prisma.avoirRef.deleteMany({ where: { id, clientId } });
+    if (result.count === 0) throw new NotFoundError('AvoirRef');
+    return result;
   }
 }
 

@@ -61,9 +61,9 @@ class ReglementRefService {
   }
 
   async delete(id: number, clientId: number) {
-    const existing = await prisma.reglementRef.findFirst({ where: { id, clientId } });
-    if (!existing) throw new NotFoundError('ReglementRef');
-    return prisma.reglementRef.delete({ where: { id } });
+    const result = await prisma.reglementRef.deleteMany({ where: { id, clientId } });
+    if (result.count === 0) throw new NotFoundError('ReglementRef');
+    return result;
   }
 }
 
