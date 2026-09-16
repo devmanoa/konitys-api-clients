@@ -16,7 +16,8 @@
     "migrate:reset": "npx ts-node scripts/migrate-from-crm.ts sql/ --reset",
     "migrate:clients": "npx ts-node scripts/migrate-from-crm.ts sql/ --only=clients,client_contacts,clients_has_secteurs_activites",
     "migrate:devis": "npx ts-node scripts/migrate-from-crm.ts sql/ --only=devis,devis_factures,avoirs,reglements",
-    "fix:sector-names": "npx ts-node scripts/fix-sector-names.ts sql/"
+    "fix:sector-names": "npx ts-node scripts/fix-sector-names.ts sql/",
+    "backfill:addresses": "node prisma/backfill-client-addresses.js"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
