@@ -10,6 +10,7 @@ import factureRefRoutes from './facture-ref.routes';
 import avoirRefRoutes from './avoir-ref.routes';
 import referenceDataRoutes from './reference-data.routes';
 import sectorRoutes from './sector.routes';
+import dashboardRoutes from './dashboard.routes';
 
 export const router = Router();
 
@@ -28,3 +29,4 @@ router.use('/reference-data', referenceDataRoutes);
 // CRUD du référentiel des secteurs. GET /reference-data/sectors reste en place
 // pour les formulaires clients ; ces routes-ci servent l'écran d'administration.
 router.use('/sectors', sectorRoutes);
+router.use('/dashboard', dashboardRoutes);
