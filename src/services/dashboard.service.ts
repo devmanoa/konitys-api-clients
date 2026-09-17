@@ -43,6 +43,10 @@ export interface DashboardStats {
     outstanding: number;
     overdueCount: number;
   };
+  /**
+   * 12 mois se terminant au dernier mois porteur de données, pas au mois
+   * courant : l'historique repris s'arrête à la date d'export du CRM.
+   */
   monthly: { month: string; devisHt: number; factureTtc: number }[];
   topClients: { id: number; label: string; totalTtc: number; factureCount: number }[];
   bySector: { id: number; nom: string; clientCount: number }[];
@@ -53,7 +57,6 @@ class DashboardService {
     const activeClient = { client: { isDeleted: false } };
     const startThisMonth = monthStart(0);
     const startPrevMonth = monthStart(1);
-    const start12Months = monthStart(11);
 
     const [
       total,
@@ -122,7 +125,7 @@ class DashboardService {
       (factureByStatus.payee?.totalTtc ?? 0) + (factureByStatus.partiellement_payee?.totalTtc ?? 0);
 
     const [monthly, topClients, bySector] = await Promise.all([
-      this.monthlySeries(start12Months),
+      this.monthlySeries(),
       this.topClients(),
       this.bySector(),
     ]);
@@ -156,13 +159,41 @@ class DashboardService {
     };
   }
 
-  /** Devis signés et factures émises, mois par mois sur 12 mois. */
-  private async monthlySeries(since: Date) {
+  /**
+   * Devis et factures, mois par mois sur 12 mois.
+   *
+   * La fenêtre se cale sur le dernier mois qui porte réellement des données,
+   * pas sur le mois courant : l'historique repris du CRM s'arrête à sa date
+   * d'export, et une fenêtre glissante afficherait douze mois vides.
+   */
+  private async monthlySeries() {
+    const [bounds] = await prisma.$queryRaw<[{ last_month: Date | null }]>`
+      SELECT date_trunc('month', MAX(d)) AS last_month
+      FROM (
+        SELECT COALESCE(dr.date_creation, dr.created_at) AS d
+        FROM devis_ref dr
+        JOIN clients c ON c.id = dr.client_id AND c.is_deleted = false
+        UNION ALL
+        SELECT COALESCE(fr.date_creation, fr.created_at)
+        FROM facture_ref fr
+        JOIN clients c ON c.id = fr.client_id AND c.is_deleted = false
+        WHERE fr.status::text NOT IN ('brouillon', 'annulee')
+      ) AS all_dates
+    `;
+
+    const now = new Date();
+    const lastMonth = bounds?.last_month ? new Date(bounds.last_month) : null;
+    // Jamais de fenêtre dans le futur : des dates aberrantes existent en base
+    // (le dump contient des documents datés 2027).
+    const anchor = lastMonth && lastMonth < now ? lastMonth : now;
+    const since = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth() - 11, 1));
+    const until = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1));
+
     const rows = await prisma.$queryRaw<{ month: Date; devis_ht: unknown; facture_ttc: unknown }[]>`
       WITH months AS (
         SELECT generate_series(
           date_trunc('month', ${since}::timestamp),
-          date_trunc('month', now()),
+          date_trunc('month', ${until}::timestamp),
           interval '1 month'
         ) AS month
       ),
